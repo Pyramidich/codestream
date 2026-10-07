@@ -113,6 +113,29 @@ websocat "ws://localhost:8080/ws?token=<access_token>&file_id=<file_id>"
 { "event": "ping", "data": {} }
 ```
 
+## Collaborative Editing
+
+### WebSocket-сообщения
+
+**Client → Server:**
+
+```json
+{ "event": "join:file", "data": { "fileId": "...", "stateVector": "..." } }
+{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA..." } }
+{ "event": "leave:file", "data": { "fileId": "..." } }
+{ "event": "pong", "data": {} }
+```
+
+**Server → Client:**
+
+```json
+{ "event": "doc:sync", "data": { "fileId": "...", "state": "AAABAA...", "stateVector": "..." } }
+{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA...", "userId": "..." } }
+{ "event": "user:joined", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "user:left", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "ping", "data": {} }
+```
+
 ## Projects & Files API
 
 ### Проекты

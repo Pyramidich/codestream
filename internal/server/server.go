@@ -61,13 +61,16 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 
 	// WebSocket
 	hub := ws.NewHub()
+	documentVersionRepo := repository.NewDocumentVersionRepository(db)
+	documentStateManager := service.NewDocumentStateManager(hub, fileRepo, documentVersionRepo, logger)
+	documentStateManager.StartSnapshotWorker(context.Background(), 30*time.Second)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	memberHandler := handler.NewProjectMemberHandler(memberService)
 	fileHandler := handler.NewFileHandler(fileService)
-	wsHandler := handler.NewWSHandler(hub, fileService, cfg.JWTSecret, logger)
+	wsHandler := handler.NewWSHandler(hub, fileService, documentStateManager, cfg.JWTSecret, logger)
 
 	authMW := middleware.AuthMiddleware(cfg.JWTSecret)
 
