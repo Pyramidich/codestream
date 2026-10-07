@@ -21,17 +21,24 @@ type FileRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
+// ChangeHistoryLogger defines the change history logging interface.
+type ChangeHistoryLogger interface {
+	Log(ctx context.Context, userID uuid.UUID, action string, fileID, projectID *uuid.UUID, metadata map[string]interface{})
+}
+
 // FileService provides file management operations.
 type FileService struct {
-	fileRepo FileRepository
-	authz    *authz.Authorization
+	fileRepo    FileRepository
+	authz       *authz.Authorization
+	changeHist  ChangeHistoryLogger
 }
 
 // NewFileService creates a new FileService.
-func NewFileService(fileRepo FileRepository, authz *authz.Authorization) *FileService {
+func NewFileService(fileRepo FileRepository, authz *authz.Authorization, changeHist ChangeHistoryLogger) *FileService {
 	return &FileService{
-		fileRepo: fileRepo,
-		authz:    authz,
+		fileRepo:   fileRepo,
+		authz:      authz,
+		changeHist: changeHist,
 	}
 }
 
@@ -71,7 +78,18 @@ func (s *FileService) Create(ctx context.Context, projectID, userID uuid.UUID, n
 		ContentType: "yjs-binary",
 	}
 
-	return s.fileRepo.Create(ctx, file)
+	created, err := s.fileRepo.Create(ctx, file)
+	if err != nil {
+		return nil, err
+	}
+
+	s.changeHist.Log(ctx, userID, "file.created", &created.ID, &projectID, map[string]interface{}{
+		"name":     created.Name,
+		"path":     created.Path,
+		"language": created.Language,
+	})
+
+	return created, nil
 }
 
 // GetByID returns a file if the user can access the project.
@@ -169,9 +187,27 @@ func (s *FileService) Update(ctx context.Context, fileID, userID uuid.UUID, upda
 		file.ContentType = "yjs-binary"
 	}
 
+	changedFields := []string{}
+	if updates.Name != nil {
+		changedFields = append(changedFields, "name")
+	}
+	if updates.Path != nil {
+		changedFields = append(changedFields, "path")
+	}
+	if updates.Language != nil {
+		changedFields = append(changedFields, "language")
+	}
+	if updates.Content != nil {
+		changedFields = append(changedFields, "content")
+	}
+
 	if err := s.fileRepo.Update(ctx, file); err != nil {
 		return nil, err
 	}
+
+	s.changeHist.Log(ctx, userID, "file.updated", &file.ID, &file.ProjectID, map[string]interface{}{
+		"changed_fields": changedFields,
+	})
 
 	return file, nil
 }
@@ -195,6 +231,11 @@ func (s *FileService) Delete(ctx context.Context, fileID, userID uuid.UUID) erro
 	if !canEdit {
 		return errors.New("insufficient permissions")
 	}
+
+	s.changeHist.Log(ctx, userID, "file.deleted", &file.ID, &file.ProjectID, map[string]interface{}{
+		"id":   file.ID.String(),
+		"name": file.Name,
+	})
 
 	return s.fileRepo.Delete(ctx, fileID)
 }

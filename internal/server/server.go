@@ -55,9 +55,11 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 
 	// Services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
-	projectService := service.NewProjectService(projectRepo, projectMemberRepo, authzInstance)
-	memberService := service.NewProjectMemberService(projectMemberRepo, userRepo, authzInstance)
-	fileService := service.NewFileService(fileRepo, authzInstance)
+	changeHistRepo := repository.NewChangeHistoryRepository(db)
+	changeHistService := service.NewChangeHistoryService(changeHistRepo, logger)
+	projectService := service.NewProjectService(projectRepo, projectMemberRepo, authzInstance, changeHistService)
+	memberService := service.NewProjectMemberService(projectMemberRepo, userRepo, authzInstance, changeHistService)
+	fileService := service.NewFileService(fileRepo, authzInstance, changeHistService)
 
 	// WebSocket
 	hub := ws.NewHub()

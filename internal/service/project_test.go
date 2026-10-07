@@ -87,7 +87,7 @@ func newTestProjectService() (*service.ProjectService, *mockProjectRepo, *mockMe
 	projectRepo := &mockProjectRepo{}
 	memberRepo := &mockMemberRepoForProject{}
 	authzInstance := authz.NewAuthorization(memberRepo)
-	return service.NewProjectService(projectRepo, memberRepo, authzInstance), projectRepo, memberRepo
+	return service.NewProjectService(projectRepo, memberRepo, authzInstance, &noopChangeHistoryLogger{}), projectRepo, memberRepo
 }
 
 func TestProjectCreate(t *testing.T) {

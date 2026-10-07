@@ -21,17 +21,19 @@ type ProjectMemberRepository interface {
 
 // ProjectMemberService provides project membership operations.
 type ProjectMemberService struct {
-	memberRepo ProjectMemberRepository
-	userRepo   UserRepository
-	authz      *authz.Authorization
+	memberRepo   ProjectMemberRepository
+	userRepo     UserRepository
+	authz        *authz.Authorization
+	changeHist   ChangeHistoryLogger
 }
 
 // NewProjectMemberService creates a new ProjectMemberService.
-func NewProjectMemberService(memberRepo ProjectMemberRepository, userRepo UserRepository, authz *authz.Authorization) *ProjectMemberService {
+func NewProjectMemberService(memberRepo ProjectMemberRepository, userRepo UserRepository, authz *authz.Authorization, changeHist ChangeHistoryLogger) *ProjectMemberService {
 	return &ProjectMemberService{
 		memberRepo: memberRepo,
 		userRepo:   userRepo,
 		authz:      authz,
+		changeHist: changeHist,
 	}
 }
 
@@ -73,7 +75,17 @@ func (s *ProjectMemberService) AddMember(ctx context.Context, projectID, ownerID
 		return nil, errors.New("user is already a member")
 	}
 
-	return s.memberRepo.Create(ctx, projectID, userID, role)
+	member, err := s.memberRepo.Create(ctx, projectID, userID, role)
+	if err != nil {
+		return nil, err
+	}
+
+	s.changeHist.Log(ctx, ownerID, "project.member_added", nil, &projectID, map[string]interface{}{
+		"user_id": userID.String(),
+		"role":    role,
+	})
+
+	return member, nil
 }
 
 // RemoveMember removes a member from a project (only owner).
@@ -91,7 +103,15 @@ func (s *ProjectMemberService) RemoveMember(ctx context.Context, projectID, owne
 		return errors.New("only owner can remove members")
 	}
 
-	return s.memberRepo.Delete(ctx, projectID, userID)
+	if err := s.memberRepo.Delete(ctx, projectID, userID); err != nil {
+		return err
+	}
+
+	s.changeHist.Log(ctx, ownerID, "project.member_removed", nil, &projectID, map[string]interface{}{
+		"user_id": userID.String(),
+	})
+
+	return nil
 }
 
 // ListMembers returns all members of a project (any member).

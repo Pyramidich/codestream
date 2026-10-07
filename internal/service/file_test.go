@@ -102,7 +102,7 @@ func newTestFileService() (*service.FileService, *mockFileRepo, *mockMemberRepoF
 	fileRepo := &mockFileRepo{}
 	memberRepo := &mockMemberRepoForFile{}
 	authzInstance := authz.NewAuthorization(memberRepo)
-	return service.NewFileService(fileRepo, authzInstance), fileRepo, memberRepo
+	return service.NewFileService(fileRepo, authzInstance, &noopChangeHistoryLogger{}), fileRepo, memberRepo
 }
 
 func TestFileCreate(t *testing.T) {

@@ -6,22 +6,19 @@
 
 CodeStream — pet-проект, демонстрирующий real-time совместное редактирование кода в браузере. Основной фокус сделан на backend: архитектура WebSocket-сервера на Go, синхронизация документов с помощью CRDT и надёжная персистентность.
 
-## Документация
+## Стек
 
-- Основное техническое проектирование: **[docs/technical-design.md](docs/technical-design.md)**
-- Обоснование выбора стека: **[docs/stack.md](docs/stack.md)**
-
-## Ключевые решения (кратко)
-
-- **Backend**: Go + Gin + GORM + PostgreSQL + Redis.
-- **Real-time**: `gorilla/websocket`.
-- **Collaborative editing**: CRDT на базе Yjs (клиент) + Go-сервер хранит и ретранслирует бинарные CRDT-updates.
-- **Frontend**: React + Vite + Monaco Editor + `y-monaco` (реализуется позже).
-- **Инфраструктура**: Docker, Docker Compose, GitHub Actions.
+- **Backend**: Go 1.27, Gin, GORM
+- **База данных**: PostgreSQL 16
+- **Кэш / pub-sub**: Redis 7
+- **Real-time**: WebSocket (`gorilla/websocket`)
+- **Collaborative editing**: CRDT (Yjs на клиенте, Go-сервер хранит/ретранслирует бинарные CRDT-updates)
+- **Контейнеризация**: Docker, Docker Compose
+- **CI/CD**: GitHub Actions
 
 ## Статус
 
-Bootstrap, аутентификация и REST API для проектов/файлов завершены. Реализованы: регистрация, логин, refresh, logout, JWT middleware, проекты, участники, файлы, авторизация на уровне ресурсов.
+MVP backend завершён. Реализованы: аутентификация (JWT + refresh tokens), проекты, участники, файлы, WebSocket foundation, collaborative editing, change history, CI/CD.
 
 ## Запуск
 
@@ -35,8 +32,11 @@ make up
 # Тесты
 make test
 
-# Миграции (требуется DATABASE_URL)
-make migrate-up
+# Линтер
+make lint
+
+# CI-пайплайн
+make ci
 ```
 
 ## Команды
@@ -44,7 +44,17 @@ make migrate-up
 - `make up` — поднять проект в Docker.
 - `make down` — остановить Docker.
 - `make test` — запустить тесты.
+- `make lint` — запустить golangci-lint.
+- `make fmt` — форматировать код.
+- `make ci` — запустить CI-проверки.
 - `make migrate-up` — применить миграции.
+
+## Архитектура
+
+Краткая схема архитектуры и потока данных описаны в [ARCHITECTURE.md](ARCHITECTURE.md).
+
+Подробное техническое проектирование: [docs/technical-design.md](docs/technical-design.md).
+Обоснование стека: [docs/stack.md](docs/stack.md).
 
 ## Auth API
 
@@ -84,56 +94,6 @@ curl -X POST http://localhost:8080/auth/logout \
 
 ```bash
 curl -H "Authorization: Bearer <access_token>" http://localhost:8080/me
-```
-
-## WebSocket
-
-### Подключение
-
-```bash
-websocat "ws://localhost:8080/ws?token=<access_token>&file_id=<file_id>"
-```
-
-### Сообщения
-
-**Client → Server:**
-
-```json
-{ "event": "join:file", "data": { "fileId": "..." } }
-{ "event": "leave:file", "data": { "fileId": "..." } }
-{ "event": "pong", "data": {} }
-```
-
-**Server → Client:**
-
-```json
-{ "event": "joined:file", "data": { "fileId": "..." } }
-{ "event": "user:joined", "data": { "userId": "...", "fileId": "..." } }
-{ "event": "user:left", "data": { "userId": "...", "fileId": "..." } }
-{ "event": "ping", "data": {} }
-```
-
-## Collaborative Editing
-
-### WebSocket-сообщения
-
-**Client → Server:**
-
-```json
-{ "event": "join:file", "data": { "fileId": "...", "stateVector": "..." } }
-{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA..." } }
-{ "event": "leave:file", "data": { "fileId": "..." } }
-{ "event": "pong", "data": {} }
-```
-
-**Server → Client:**
-
-```json
-{ "event": "doc:sync", "data": { "fileId": "...", "state": "AAABAA...", "stateVector": "..." } }
-{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA...", "userId": "..." } }
-{ "event": "user:joined", "data": { "userId": "...", "fileId": "..." } }
-{ "event": "user:left", "data": { "userId": "...", "fileId": "..." } }
-{ "event": "ping", "data": {} }
 ```
 
 ## Projects & Files API
@@ -203,3 +163,45 @@ curl -X PATCH http://localhost:8080/files/<file_id> \
 # Удалить файл
 curl -X DELETE -H "Authorization: Bearer <access_token>" http://localhost:8080/files/<file_id>
 ```
+
+## WebSocket
+
+### Подключение
+
+```bash
+websocat "ws://localhost:8080/ws?token=<access_token>&file_id=<file_id>"
+```
+
+### Сообщения
+
+**Client → Server:**
+
+```json
+{ "event": "join:file", "data": { "fileId": "...", "stateVector": "..." } }
+{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA..." } }
+{ "event": "leave:file", "data": { "fileId": "..." } }
+{ "event": "pong", "data": {} }
+```
+
+**Server → Client:**
+
+```json
+{ "event": "doc:sync", "data": { "fileId": "...", "state": "AAABAA...", "stateVector": "..." } }
+{ "event": "doc:update", "data": { "fileId": "...", "update": "AAABAA...", "userId": "..." } }
+{ "event": "user:joined", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "user:left", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "ping", "data": {} }
+```
+
+## TODO / Следующие шаги
+
+- [ ] Frontend на React + Monaco + Yjs
+- [ ] Presence (курсоры, онлайн-статус)
+- [ ] Redis pub/sub для горизонтального масштабирования WebSocket
+- [ ] Интеграционные тесты WebSocket с PostgreSQL
+- [ ] Snapshot merge на сервере через Yjs/WASM
+- [ ] Undo/redo истории
+
+## Contributing
+
+См. [CONTRIBUTING.md](CONTRIBUTING.md).

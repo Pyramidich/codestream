@@ -31,14 +31,16 @@ type ProjectService struct {
 	projectRepo ProjectRepository
 	memberRepo  ProjectMemberRepositoryForProject
 	authz       *authz.Authorization
+	changeHist  ChangeHistoryLogger
 }
 
 // NewProjectService creates a new ProjectService.
-func NewProjectService(projectRepo ProjectRepository, memberRepo ProjectMemberRepositoryForProject, authz *authz.Authorization) *ProjectService {
+func NewProjectService(projectRepo ProjectRepository, memberRepo ProjectMemberRepositoryForProject, authz *authz.Authorization, changeHist ChangeHistoryLogger) *ProjectService {
 	return &ProjectService{
 		projectRepo: projectRepo,
 		memberRepo:  memberRepo,
 		authz:       authz,
+		changeHist:  changeHist,
 	}
 }
 
@@ -124,6 +126,20 @@ func (s *ProjectService) Delete(ctx context.Context, projectID, userID uuid.UUID
 	if !canManage {
 		return errors.New("only owner can delete project")
 	}
+
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	if project == nil {
+		return errors.New("project not found")
+	}
+
+	s.changeHist.Log(ctx, userID, "project.deleted", nil, &projectID, map[string]interface{}{
+		"id":   project.ID.String(),
+		"name": project.Name,
+	})
 
 	return s.projectRepo.Delete(ctx, projectID)
 }

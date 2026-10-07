@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.27"
 
       - name: Download dependencies
         run: go mod download
@@ -25,14 +25,14 @@ jobs:
       - name: Run tests
         run: go test -race ./...
 
-      - name: Build
-        run: go build -v ./cmd/server
-
       - name: Run go vet
         run: go vet ./...
+
+      - name: Build
+        run: go build -v ./cmd/server
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.57
+          version: v1.62
           args: --timeout=5m

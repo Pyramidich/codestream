@@ -1,4 +1,4 @@
-.PHONY: up down migrate-up migrate-down test lint build run dev
+.PHONY: up down migrate-up migrate-down test lint fmt vet ci build run dev
 
 up:
 	docker compose up --build
@@ -20,6 +20,17 @@ test:
 
 lint:
 	golangci-lint run ./...
+
+fmt:
+	go fmt ./...
+
+vet:
+	go vet ./...
+
+ci:
+	go test -race ./...
+	go vet ./...
+	go build ./cmd/server
 
 build:
 	go build -o bin/server ./cmd/server

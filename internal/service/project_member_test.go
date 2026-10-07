@@ -84,7 +84,7 @@ func newTestMemberService() (*service.ProjectMemberService, *mockUserRepoForMemb
 	userRepo := &mockUserRepoForMember{}
 	memberRepo := &mockMemberRepo{}
 	authzInstance := authz.NewAuthorization(memberRepo)
-	return service.NewProjectMemberService(memberRepo, userRepo, authzInstance), userRepo, memberRepo
+	return service.NewProjectMemberService(memberRepo, userRepo, authzInstance, &noopChangeHistoryLogger{}), userRepo, memberRepo
 }
 
 func TestAddMember(t *testing.T) {
