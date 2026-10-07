@@ -9,8 +9,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 
 	"github.com/ilya/codestream/internal/config"
+	"github.com/ilya/codestream/internal/handler"
+	"github.com/ilya/codestream/internal/middleware"
+	"github.com/ilya/codestream/internal/repository"
+	"github.com/ilya/codestream/internal/service"
 )
 
 // Server holds the HTTP server and its dependencies.
@@ -22,7 +27,7 @@ type Server struct {
 }
 
 // New creates a new HTTP server with routes and middleware.
-func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client) *Server {
+func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db *gorm.DB) *Server {
 	if cfg.AppEnv == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -36,8 +41,14 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client) *Se
 		redis:  redisClient,
 	}
 
+	userRepo := repository.NewUserRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
+	authHandler := handler.NewAuthHandler(authService)
+	authMW := middleware.AuthMiddleware(cfg.JWTSecret)
+
 	s.setupMiddleware()
-	s.setupRoutes()
+	s.setupRoutes(authHandler, authMW)
 
 	return s
 }
@@ -47,9 +58,19 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(s.loggingMiddleware())
 }
 
-func (s *Server) setupRoutes() {
+func (s *Server) setupRoutes(authHandler *handler.AuthHandler, authMW gin.HandlerFunc) {
 	s.router.GET("/health", s.handleHealth)
 	s.router.GET("/ready", s.handleReady)
+
+	authGroup := s.router.Group("/auth")
+	{
+		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
+		authGroup.POST("/logout", authHandler.Logout)
+	}
+
+	s.router.GET("/me", authMW, s.handleMe)
 }
 
 // Engine exposes the gin engine for testing.
@@ -81,6 +102,16 @@ func (s *Server) handleReady(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (s *Server) handleMe(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "userID not found in context"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"user_id": userID})
 }
 
 func (s *Server) loggingMiddleware() gin.HandlerFunc {

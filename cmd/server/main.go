@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"github.com/ilya/codestream/internal/config"
 	"github.com/ilya/codestream/internal/logger"
@@ -27,10 +29,27 @@ func main() {
 	}
 	redisClient := redis.NewClient(redisOpts)
 
-	srv := server.New(cfg, log, redisClient)
+	db, err := initDB(cfg, log)
+	if err != nil {
+		log.Error("failed to connect to database", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	srv := server.New(cfg, log, redisClient, db)
 
 	if err := srv.Run(); err != nil {
 		log.Error("server error", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
+}
+
+func initDB(cfg *config.Config, log *slog.Logger) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(cfg.DatabaseURL), &gorm.Config{
+		Logger: logger.NewGORMLogger(log),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }

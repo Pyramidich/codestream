@@ -21,7 +21,7 @@ CodeStream — pet-проект, демонстрирующий real-time сов
 
 ## Статус
 
-Bootstrap backend завершён. Сервер запускается, `/health` работает, тесты проходят. Реализованы: конфигурация, логирование, Gin + health/readiness endpoints, Docker Compose с PostgreSQL и Redis, миграции, CI workflow.
+Bootstrap и аутентификация backend завершены. Реализованы: регистрация, логин, refresh, logout, JWT middleware, интеграция с PostgreSQL через GORM.
 
 ## Запуск
 
@@ -45,3 +45,43 @@ make migrate-up
 - `make down` — остановить Docker.
 - `make test` — запустить тесты.
 - `make migrate-up` — применить миграции.
+
+## Auth API
+
+### Регистрация
+
+```bash
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123","display_name":"User"}'
+```
+
+### Логин
+
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+### Refresh
+
+```bash
+curl -X POST http://localhost:8080/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<refresh_token>"}'
+```
+
+### Logout
+
+```bash
+curl -X POST http://localhost:8080/auth/logout \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token":"<refresh_token>"}'
+```
+
+### Защищённый endpoint
+
+```bash
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/me
+```

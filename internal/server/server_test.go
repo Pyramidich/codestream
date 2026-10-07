@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,10 +15,10 @@ import (
 )
 
 func TestHealthEndpoint(t *testing.T) {
-	cfg := &config.Config{AppEnv: "dev", HTTPPort: "8080"}
+	cfg := &config.Config{AppEnv: "dev", HTTPPort: "8080", JWTAccessTTL: 15 * time.Minute, JWTRefreshTTL: 7 * 24 * time.Hour}
 	log := logger.New("dev", "info")
 
-	srv := server.New(cfg, log, nil)
+	srv := server.New(cfg, log, nil, nil)
 	w := httptest.NewRecorder()
 	req, err := http.NewRequest(http.MethodGet, "/health", nil)
 	require.NoError(t, err)
