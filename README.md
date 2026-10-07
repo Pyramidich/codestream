@@ -86,6 +86,33 @@ curl -X POST http://localhost:8080/auth/logout \
 curl -H "Authorization: Bearer <access_token>" http://localhost:8080/me
 ```
 
+## WebSocket
+
+### Подключение
+
+```bash
+websocat "ws://localhost:8080/ws?token=<access_token>&file_id=<file_id>"
+```
+
+### Сообщения
+
+**Client → Server:**
+
+```json
+{ "event": "join:file", "data": { "fileId": "..." } }
+{ "event": "leave:file", "data": { "fileId": "..." } }
+{ "event": "pong", "data": {} }
+```
+
+**Server → Client:**
+
+```json
+{ "event": "joined:file", "data": { "fileId": "..." } }
+{ "event": "user:joined", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "user:left", "data": { "userId": "...", "fileId": "..." } }
+{ "event": "ping", "data": {} }
+```
+
 ## Projects & Files API
 
 ### Проекты

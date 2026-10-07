@@ -17,6 +17,7 @@ import (
 	"github.com/ilya/codestream/internal/middleware"
 	"github.com/ilya/codestream/internal/repository"
 	"github.com/ilya/codestream/internal/service"
+	"github.com/ilya/codestream/internal/ws"
 )
 
 // Server holds the HTTP server and its dependencies.
@@ -58,16 +59,20 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 	memberService := service.NewProjectMemberService(projectMemberRepo, userRepo, authzInstance)
 	fileService := service.NewFileService(fileRepo, authzInstance)
 
+	// WebSocket
+	hub := ws.NewHub()
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
 	projectHandler := handler.NewProjectHandler(projectService)
 	memberHandler := handler.NewProjectMemberHandler(memberService)
 	fileHandler := handler.NewFileHandler(fileService)
+	wsHandler := handler.NewWSHandler(hub, fileService, cfg.JWTSecret, logger)
 
 	authMW := middleware.AuthMiddleware(cfg.JWTSecret)
 
 	s.setupMiddleware()
-	s.setupRoutes(authHandler, projectHandler, memberHandler, fileHandler, authMW)
+	s.setupRoutes(authHandler, projectHandler, memberHandler, fileHandler, wsHandler, authMW)
 
 	return s
 }
@@ -82,6 +87,7 @@ func (s *Server) setupRoutes(
 	projectHandler *handler.ProjectHandler,
 	memberHandler *handler.ProjectMemberHandler,
 	fileHandler *handler.FileHandler,
+	wsHandler *handler.WSHandler,
 	authMW gin.HandlerFunc,
 ) {
 	s.router.GET("/health", s.handleHealth)
@@ -94,6 +100,8 @@ func (s *Server) setupRoutes(
 		authGroup.POST("/refresh", authHandler.Refresh)
 		authGroup.POST("/logout", authHandler.Logout)
 	}
+
+	s.router.GET("/ws", wsHandler.Handle)
 
 	authorized := s.router.Group("/")
 	authorized.Use(authMW)
