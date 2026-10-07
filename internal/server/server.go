@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
+	"github.com/ilya/codestream/internal/authz"
 	"github.com/ilya/codestream/internal/config"
 	"github.com/ilya/codestream/internal/handler"
 	"github.com/ilya/codestream/internal/middleware"
@@ -41,14 +42,32 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 		redis:  redisClient,
 	}
 
+	// Repositories
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	projectRepo := repository.NewProjectRepository(db)
+	projectMemberRepo := repository.NewProjectMemberRepository(db)
+	fileRepo := repository.NewFileRepository(db)
+
+	// Authorization
+	authzInstance := authz.NewAuthorization(projectMemberRepo)
+
+	// Services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
+	projectService := service.NewProjectService(projectRepo, projectMemberRepo, authzInstance)
+	memberService := service.NewProjectMemberService(projectMemberRepo, userRepo, authzInstance)
+	fileService := service.NewFileService(fileRepo, authzInstance)
+
+	// Handlers
 	authHandler := handler.NewAuthHandler(authService)
+	projectHandler := handler.NewProjectHandler(projectService)
+	memberHandler := handler.NewProjectMemberHandler(memberService)
+	fileHandler := handler.NewFileHandler(fileService)
+
 	authMW := middleware.AuthMiddleware(cfg.JWTSecret)
 
 	s.setupMiddleware()
-	s.setupRoutes(authHandler, authMW)
+	s.setupRoutes(authHandler, projectHandler, memberHandler, fileHandler, authMW)
 
 	return s
 }
@@ -58,7 +77,13 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(s.loggingMiddleware())
 }
 
-func (s *Server) setupRoutes(authHandler *handler.AuthHandler, authMW gin.HandlerFunc) {
+func (s *Server) setupRoutes(
+	authHandler *handler.AuthHandler,
+	projectHandler *handler.ProjectHandler,
+	memberHandler *handler.ProjectMemberHandler,
+	fileHandler *handler.FileHandler,
+	authMW gin.HandlerFunc,
+) {
 	s.router.GET("/health", s.handleHealth)
 	s.router.GET("/ready", s.handleReady)
 
@@ -70,7 +95,30 @@ func (s *Server) setupRoutes(authHandler *handler.AuthHandler, authMW gin.Handle
 		authGroup.POST("/logout", authHandler.Logout)
 	}
 
-	s.router.GET("/me", authMW, s.handleMe)
+	authorized := s.router.Group("/")
+	authorized.Use(authMW)
+	{
+		authorized.GET("/me", s.handleMe)
+
+		// Projects
+		authorized.POST("/projects", projectHandler.Create)
+		authorized.GET("/projects", projectHandler.List)
+		authorized.GET("/projects/:id", projectHandler.Get)
+		authorized.PATCH("/projects/:id", projectHandler.Update)
+		authorized.DELETE("/projects/:id", projectHandler.Delete)
+
+		// Project members
+		authorized.POST("/projects/:id/members", memberHandler.Add)
+		authorized.GET("/projects/:id/members", memberHandler.List)
+		authorized.DELETE("/projects/:id/members/:user_id", memberHandler.Remove)
+
+		// Files
+		authorized.POST("/projects/:id/files", fileHandler.Create)
+		authorized.GET("/projects/:id/files", fileHandler.List)
+		authorized.GET("/files/:id", fileHandler.Get)
+		authorized.PATCH("/files/:id", fileHandler.Update)
+		authorized.DELETE("/files/:id", fileHandler.Delete)
+	}
 }
 
 // Engine exposes the gin engine for testing.

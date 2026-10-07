@@ -21,7 +21,7 @@ CodeStream — pet-проект, демонстрирующий real-time сов
 
 ## Статус
 
-Bootstrap и аутентификация backend завершены. Реализованы: регистрация, логин, refresh, logout, JWT middleware, интеграция с PostgreSQL через GORM.
+Bootstrap, аутентификация и REST API для проектов/файлов завершены. Реализованы: регистрация, логин, refresh, logout, JWT middleware, проекты, участники, файлы, авторизация на уровне ресурсов.
 
 ## Запуск
 
@@ -84,4 +84,72 @@ curl -X POST http://localhost:8080/auth/logout \
 
 ```bash
 curl -H "Authorization: Bearer <access_token>" http://localhost:8080/me
+```
+
+## Projects & Files API
+
+### Проекты
+
+```bash
+# Создать проект
+curl -X POST http://localhost:8080/projects \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Project"}'
+
+# Получить список проектов
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/projects
+
+# Получить проект
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/projects/<project_id>
+
+# Обновить проект
+curl -X PATCH http://localhost:8080/projects/<project_id> \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"New Name"}'
+
+# Удалить проект
+curl -X DELETE -H "Authorization: Bearer <access_token>" http://localhost:8080/projects/<project_id>
+```
+
+### Участники проекта
+
+```bash
+# Добавить участника
+curl -X POST http://localhost:8080/projects/<project_id>/members \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"...","role":"editor"}'
+
+# Получить список участников
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/projects/<project_id>/members
+
+# Удалить участника
+curl -X DELETE -H "Authorization: Bearer <access_token>" http://localhost:8080/projects/<project_id>/members/<user_id>
+```
+
+### Файлы
+
+```bash
+# Создать файл
+curl -X POST http://localhost:8080/projects/<project_id>/files \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"main.go","path":"/main.go","language":"go"}'
+
+# Получить список файлов проекта
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/projects/<project_id>/files
+
+# Получить файл
+curl -H "Authorization: Bearer <access_token>" http://localhost:8080/files/<file_id>
+
+# Обновить файл
+curl -X PATCH http://localhost:8080/files/<file_id> \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"updated.go","path":"/updated.go","language":"go"}'
+
+# Удалить файл
+curl -X DELETE -H "Authorization: Bearer <access_token>" http://localhost:8080/files/<file_id>
 ```
