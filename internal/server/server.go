@@ -139,6 +139,11 @@ func (s *Server) Engine() *gin.Engine {
 	return s.router
 }
 
+// Handler returns the http.Handler for testing with httptest.
+func (s *Server) Handler() http.Handler {
+	return s.router
+}
+
 // Run starts the HTTP server.
 func (s *Server) Run() error {
 	addr := fmt.Sprintf(":%s", s.config.HTTPPort)

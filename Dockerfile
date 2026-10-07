@@ -1,5 +1,7 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
+
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 
@@ -10,7 +12,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app/server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
 
 # Runtime stage
 FROM alpine:3.19

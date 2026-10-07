@@ -1,7 +1,2 @@
-version: "3.8"
-
-services:
-  app:
-    volumes:
-      - .:/app
-    command: ["go", "run", "./cmd/server"]
+# Empty override to avoid breaking production command.
+# Use docker-compose.dev.yml for live-reload development setup.
