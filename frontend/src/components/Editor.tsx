@@ -31,8 +31,8 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
     providerRef.current = provider
 
     provider.onMessage((message: WebSocketMessage) => {
-      if (message.type === 'doc:sync') {
-        const payload = message.payload as { state?: string; stateVector?: string }
+      if (message.event === 'doc:sync') {
+        const payload = message.data as { state?: string; stateVector?: string }
         if (payload.state) {
           try {
             const update = base64ToArrayBuffer(payload.state)
@@ -41,8 +41,8 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
             // ignore invalid sync
           }
         }
-      } else if (message.type === 'doc:update') {
-        const payload = message.payload as { update?: string }
+      } else if (message.event === 'doc:update') {
+        const payload = message.data as { update?: string }
         if (payload.update) {
           try {
             const update = base64ToArrayBuffer(payload.update)
@@ -63,7 +63,7 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
 
     provider.connect()
 
-    const stateVector = Y.encodeStateAsUpdate(yDocRef.current)
+    const stateVector = Y.encodeStateVector(yDocRef.current)
     provider.sendJoin(stateVector)
 
     return () => {

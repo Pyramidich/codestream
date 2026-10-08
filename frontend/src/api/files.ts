@@ -1,9 +1,13 @@
 import apiClient from './client'
 import type { ProjectFile } from '../types'
 
+export interface FilesResponse {
+  files: ProjectFile[]
+}
+
 export const filesApi = {
   getFiles: (projectId: string) =>
-    apiClient.get<ProjectFile[]>(`/projects/${projectId}/files`),
+    apiClient.get<ProjectFile[] | FilesResponse>(`/projects/${projectId}/files`),
 
   createFile: (
     projectId: string,

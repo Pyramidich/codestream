@@ -1,6 +1,6 @@
 export interface WebSocketMessage {
-  type: string
-  payload: Record<string, unknown>
+  event: string
+  data: Record<string, unknown>
 }
 
 export class CodestreamProvider {
@@ -63,7 +63,7 @@ export class CodestreamProvider {
   }
 
   private handleServerMessage(message: WebSocketMessage) {
-    if (message.type === 'ping') {
+    if (message.event === 'ping') {
       this.sendPong()
       return
     }
@@ -85,9 +85,9 @@ export class CodestreamProvider {
     this.messageListeners.push(callback)
   }
 
-  private send(type: string, payload: Record<string, unknown>) {
+  private send(event: string, data: Record<string, unknown>) {
     if (this.ws?.readyState !== WebSocket.OPEN) return
-    this.ws.send(JSON.stringify({ type, payload }))
+    this.ws.send(JSON.stringify({ event, data }))
   }
 
   sendUpdate(update: Uint8Array) {
@@ -100,7 +100,7 @@ export class CodestreamProvider {
   sendJoin(stateVector: Uint8Array | null) {
     this.send('join:file', {
       fileId: this.fileId,
-      stateVector: stateVector ? arrayBufferToBase64(stateVector) : null,
+      stateVector: stateVector ? arrayBufferToBase64(stateVector) : '',
     })
   }
 

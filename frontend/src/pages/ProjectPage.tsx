@@ -28,8 +28,13 @@ const ProjectPage: React.FC = () => {
         projectsApi.getProject(id),
         filesApi.getFiles(id),
       ])
+      const filesData = filesResponse.data
       setProject(projectResponse.data)
-      setFiles(filesResponse.data)
+      setFiles(
+        Array.isArray(filesData)
+          ? filesData
+          : (filesData as { files?: ProjectFile[] }).files ?? [],
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load project')
     } finally {

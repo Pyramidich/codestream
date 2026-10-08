@@ -16,7 +16,9 @@ const ProjectsPage: React.FC = () => {
     setError(null)
     try {
       const response = await projectsApi.getProjects()
-      setProjects(response.data)
+      const data = response.data
+      const projects = Array.isArray(data) ? data : data.projects ?? []
+      setProjects(projects)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load projects')
     } finally {
