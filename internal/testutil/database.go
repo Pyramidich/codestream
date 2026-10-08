@@ -3,6 +3,8 @@ package testutil
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -78,7 +80,14 @@ func NewTestRedis(t *testing.T) *redis.Client {
 }
 
 func runMigrations(dsn string) error {
-	m, err := migrate.New("file://migrations", dsn)
+	_, file, _, _ := runtime.Caller(0)
+	migrationsPath := filepath.Join(filepath.Dir(file), "..", "..", "migrations")
+	absPath, err := filepath.Abs(migrationsPath)
+	if err != nil {
+		return err
+	}
+
+	m, err := migrate.New("file://"+absPath, dsn)
 	if err != nil {
 		return err
 	}
