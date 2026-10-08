@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/ilya/codestream/internal/config"
 	"github.com/ilya/codestream/internal/handler"
 	"github.com/ilya/codestream/internal/middleware"
+	"github.com/ilya/codestream/internal/models"
 	"github.com/ilya/codestream/internal/repository"
 	"github.com/ilya/codestream/internal/service"
 	"github.com/ilya/codestream/internal/ws"
@@ -22,10 +25,16 @@ import (
 
 // Server holds the HTTP server and its dependencies.
 type Server struct {
-	router *gin.Engine
-	config *config.Config
-	logger *slog.Logger
-	redis  *redis.Client
+	router      *gin.Engine
+	config      *config.Config
+	logger      *slog.Logger
+	redis       *redis.Client
+	userService UserService
+}
+
+// UserService provides minimal user lookup for the /me endpoint.
+type UserService interface {
+	FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 }
 
 // New creates a new HTTP server with routes and middleware.
@@ -55,6 +64,7 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 
 	// Services
 	authService := service.NewAuthService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
+	s.userService = userRepo
 	changeHistRepo := repository.NewChangeHistoryRepository(db)
 	changeHistService := service.NewChangeHistoryService(changeHistRepo, logger)
 	projectService := service.NewProjectService(projectRepo, projectMemberRepo, authzInstance, changeHistService)
@@ -84,6 +94,14 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 
 func (s *Server) setupMiddleware() {
 	s.router.Use(gin.Recovery())
+	s.router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 	s.router.Use(s.loggingMiddleware())
 }
 
@@ -177,7 +195,29 @@ func (s *Server) handleMe(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"user_id": userID})
+	id, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid userID in context"})
+		return
+	}
+
+	user, err := s.userService.FindByID(c.Request.Context(), id)
+	if err != nil {
+		s.logger.Error("failed to load user", slog.String("error", err.Error()))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load user"})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":           user.ID,
+		"email":        user.Email,
+		"display_name": user.DisplayName,
+	})
 }
 
 func (s *Server) loggingMiddleware() gin.HandlerFunc {
