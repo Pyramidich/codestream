@@ -14,6 +14,7 @@ import { getUserColor } from '../utils/colors'
 interface EditorProps {
   fileId: string
   projectId: string
+  language?: string
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
@@ -26,7 +27,7 @@ interface AwarenessUserState {
   }
 }
 
-const Editor: React.FC<EditorProps> = ({ fileId }) => {
+const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
   const { user } = useAuth()
   const yDocRef = useRef(new Y.Doc())
   const providerRef = useRef<CodestreamProvider | null>(null)
@@ -280,7 +281,8 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
       </div>
       <div className="h-[600px] border border-gray-300 rounded-md overflow-hidden">
         <MonacoEditor
-          defaultLanguage="javascript"
+          defaultLanguage={language || 'plaintext'}
+          language={language || 'plaintext'}
           theme="vs-light"
           onMount={handleEditorMount}
           options={{

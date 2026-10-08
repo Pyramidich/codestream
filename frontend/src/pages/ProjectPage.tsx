@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { projectsApi } from '../api/projects'
 import { filesApi } from '../api/files'
-import type { Project as ProjectType, ProjectFile } from '../types'
+import { useAuth } from '../contexts/AuthContext'
+import { detectLanguage, LANGUAGE_OPTIONS } from '../utils/language'
+import type { Project as ProjectType, ProjectFile, ProjectMember } from '../types'
 
 const ProjectPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [project, setProject] = useState<ProjectType | null>(null)
   const [files, setFiles] = useState<ProjectFile[]>([])
+  const [members, setMembers] = useState<ProjectMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -24,9 +28,10 @@ const ProjectPage: React.FC = () => {
     setIsLoading(true)
     setError(null)
     try {
-      const [projectResponse, filesResponse] = await Promise.all([
+      const [projectResponse, filesResponse, membersResponse] = await Promise.all([
         projectsApi.getProject(id),
         filesApi.getFiles(id),
+        projectsApi.getMembers(id),
       ])
       const filesData = filesResponse.data
       setProject(projectResponse.data)
@@ -35,6 +40,7 @@ const ProjectPage: React.FC = () => {
           ? filesData
           : (filesData as { files?: ProjectFile[] }).files ?? [],
       )
+      setMembers(membersResponse.data.members)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load project')
     } finally {
@@ -47,18 +53,20 @@ const ProjectPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
+  const currentUserRole =
+    user && members.find((m) => m.user_id === user.id)?.role
+
   const handleCreateFile = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!id) return
 
     setIsCreating(true)
     try {
-      await filesApi.createFile(
-        id,
-        newFile.name.trim(),
-        newFile.path.trim(),
-        newFile.language.trim(),
-      )
+      const name = newFile.name.trim()
+      const path = newFile.path.trim()
+      const language =
+        newFile.language.trim() || detectLanguage(name || path)
+      await filesApi.createFile(id, name, path, language)
       setNewFile({ name: '', path: '', language: '' })
       setIsModalOpen(false)
       await fetchProject()
@@ -88,13 +96,28 @@ const ProjectPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 {project?.name}
               </h1>
+              {currentUserRole && (
+                <p className="text-sm text-gray-500 mt-1 capitalize">
+                  Your role: {currentUserRole}
+                </p>
+              )}
             </div>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Create File
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                to={`/projects/${id}/settings`}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Settings
+              </Link>
+              {currentUserRole !== 'viewer' && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  Create File
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -128,7 +151,31 @@ const ProjectPage: React.FC = () => {
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">
                   Members
                 </h2>
-                <p className="text-sm text-gray-600">Members list will be here</p>
+                {members.length === 0 ? (
+                  <p className="text-sm text-gray-600">No members yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {members.map((member) => (
+                      <li
+                        key={member.user_id}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-gray-700 truncate">
+                          {member.display_name || member.email}
+                        </span>
+                        <span className="text-xs text-gray-500 capitalize">
+                          {member.role}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Link
+                  to={`/projects/${id}/settings`}
+                  className="mt-3 inline-block text-sm text-indigo-600 hover:text-indigo-500"
+                >
+                  Manage members →
+                </Link>
               </div>
             </div>
 
@@ -193,16 +240,20 @@ const ProjectPage: React.FC = () => {
                 >
                   Language
                 </label>
-                <input
+                <select
                   id="fileLanguage"
-                  type="text"
                   value={newFile.language}
                   onChange={(e) =>
                     setNewFile({ ...newFile, language: e.target.value })
                   }
-                  required
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
-                />
+                >
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="flex justify-end gap-2">
                 <button

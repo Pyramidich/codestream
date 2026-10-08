@@ -44,7 +44,7 @@ const EditorPage: React.FC = () => {
       )}
 
       <div className="flex-1 min-h-0">
-        <Editor fileId={fileId} projectId={projectId} />
+        <Editor fileId={fileId} projectId={projectId} language={file?.language} />
       </div>
     </div>
   )

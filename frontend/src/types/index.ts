@@ -7,12 +7,10 @@ export interface Project {
 }
 
 export interface ProjectMember {
-  id: string
-  project_id: string
   user_id: string
+  email: string
+  display_name: string
   role: string
-  created_at: string
-  updated_at: string
 }
 
 export interface ProjectFile {

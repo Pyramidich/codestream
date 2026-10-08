@@ -5,6 +5,10 @@ export interface ProjectsResponse {
   projects: Project[]
 }
 
+export interface MembersResponse {
+  members: ProjectMember[]
+}
+
 export const projectsApi = {
   getProjects: () =>
     apiClient.get<Project[] | ProjectsResponse>('/projects'),
@@ -14,11 +18,17 @@ export const projectsApi = {
 
   getProject: (id: string) => apiClient.get<Project>(`/projects/${id}`),
 
-  addMember: (projectId: string, userId: string, role: string) =>
+  getMembers: (projectId: string) =>
+    apiClient.get<MembersResponse>(`/projects/${projectId}/members`),
+
+  addMember: (projectId: string, email: string, role: string) =>
     apiClient.post<ProjectMember>(`/projects/${projectId}/members`, {
-      user_id: userId,
+      email,
       role,
     }),
+
+  removeMember: (projectId: string, userId: string) =>
+    apiClient.delete(`/projects/${projectId}/members/${userId}`),
 }
 
 export default projectsApi
