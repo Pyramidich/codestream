@@ -68,7 +68,7 @@ func (r *FileRepository) FindByProjectIDAndPath(ctx context.Context, projectID u
 // Update updates a file.
 func (r *FileRepository) Update(ctx context.Context, file *models.File) error {
 	return r.db.WithContext(ctx).Model(file).
-		Select("name", "path", "language", "content", "content_type", "updated_at").
+		Select("name", "path", "language", "content", "content_text", "content_type", "updated_at").
 		Updates(file).Error
 }
 

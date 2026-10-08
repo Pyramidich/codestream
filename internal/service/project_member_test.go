@@ -70,6 +70,10 @@ func (m *mockMemberRepo) FindByProjectID(ctx context.Context, projectID uuid.UUI
 	return result, nil
 }
 
+func (m *mockMemberRepo) FindByProjectIDWithUser(ctx context.Context, projectID uuid.UUID) ([]models.ProjectMember, error) {
+	return m.FindByProjectID(ctx, projectID)
+}
+
 func (m *mockMemberRepo) Delete(ctx context.Context, projectID, userID uuid.UUID) error {
 	for i, member := range m.members {
 		if member.ProjectID == projectID && member.UserID == userID {
@@ -99,9 +103,10 @@ func TestAddMember(t *testing.T) {
 	user, err := userRepo.Create(context.Background(), "member@example.com", "hash", "Member")
 	require.NoError(t, err)
 
-	member, err := svc.AddMember(context.Background(), projectID, ownerID, user.ID, "editor")
+	member, err := svc.AddMember(context.Background(), projectID, ownerID, "member@example.com", "editor")
 	require.NoError(t, err)
 	assert.Equal(t, "editor", member.Role)
+	assert.Equal(t, user.ID, member.UserID)
 }
 
 func TestRemoveMember(t *testing.T) {
@@ -115,9 +120,80 @@ func TestRemoveMember(t *testing.T) {
 	user, err := userRepo.Create(context.Background(), "member@example.com", "hash", "Member")
 	require.NoError(t, err)
 
-	_, err = svc.AddMember(context.Background(), projectID, ownerID, user.ID, "editor")
+	_, err = svc.AddMember(context.Background(), projectID, ownerID, "member@example.com", "editor")
 	require.NoError(t, err)
 
 	err = svc.RemoveMember(context.Background(), projectID, ownerID, user.ID)
 	require.NoError(t, err)
+}
+
+func TestEditorCanAddMember(t *testing.T) {
+	svc, userRepo, memberRepo := newTestMemberService()
+	ownerID := uuid.New()
+	editorID := uuid.New()
+	projectID := uuid.New()
+
+	_, err := memberRepo.Create(context.Background(), projectID, ownerID, "owner")
+	require.NoError(t, err)
+	_, err = memberRepo.Create(context.Background(), projectID, editorID, "editor")
+	require.NoError(t, err)
+
+	user, err := userRepo.Create(context.Background(), "member@example.com", "hash", "Member")
+	require.NoError(t, err)
+
+	member, err := svc.AddMember(context.Background(), projectID, editorID, "member@example.com", "viewer")
+	require.NoError(t, err)
+	assert.Equal(t, "viewer", member.Role)
+	assert.Equal(t, user.ID, member.UserID)
+}
+
+func TestViewerCannotAddMember(t *testing.T) {
+	svc, userRepo, memberRepo := newTestMemberService()
+	ownerID := uuid.New()
+	viewerID := uuid.New()
+	projectID := uuid.New()
+
+	_, err := memberRepo.Create(context.Background(), projectID, ownerID, "owner")
+	require.NoError(t, err)
+	_, err = memberRepo.Create(context.Background(), projectID, viewerID, "viewer")
+	require.NoError(t, err)
+
+	_, err = userRepo.Create(context.Background(), "member@example.com", "hash", "Member")
+	require.NoError(t, err)
+
+	_, err = svc.AddMember(context.Background(), projectID, viewerID, "member@example.com", "editor")
+	require.Error(t, err)
+	assert.Equal(t, "only owner or editor can add members", err.Error())
+}
+
+func TestRemoveLastOwnerBlocked(t *testing.T) {
+	svc, _, memberRepo := newTestMemberService()
+	ownerID := uuid.New()
+	projectID := uuid.New()
+
+	_, err := memberRepo.Create(context.Background(), projectID, ownerID, "owner")
+	require.NoError(t, err)
+
+	err = svc.RemoveMember(context.Background(), projectID, ownerID, ownerID)
+	require.Error(t, err)
+	assert.Equal(t, "cannot remove yourself", err.Error())
+}
+
+func TestListMembersEnriched(t *testing.T) {
+	svc, userRepo, memberRepo := newTestMemberService()
+	ownerID := uuid.New()
+	projectID := uuid.New()
+
+	_, err := memberRepo.Create(context.Background(), projectID, ownerID, "owner")
+	require.NoError(t, err)
+
+	_, err = userRepo.Create(context.Background(), "member@example.com", "hash", "Member")
+	require.NoError(t, err)
+
+	_, err = svc.AddMember(context.Background(), projectID, ownerID, "member@example.com", "editor")
+	require.NoError(t, err)
+
+	infos, err := svc.ListMembers(context.Background(), projectID, ownerID)
+	require.NoError(t, err)
+	require.Len(t, infos, 2)
 }

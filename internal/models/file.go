@@ -13,8 +13,9 @@ type File struct {
 	Name        string    `gorm:"not null" json:"name"`
 	Path        string    `gorm:"not null" json:"path"`
 	Language    string    `json:"language"`
-	Content     []byte    `gorm:"type:bytea" json:"-"`
-	ContentType string    `gorm:"column:content_type;default:'yjs-binary'" json:"content_type"`
+	Content      []byte  `gorm:"type:bytea" json:"-"`
+	ContentText  *string `gorm:"type:text" json:"content_text,omitempty"`
+	ContentType  string  `gorm:"column:content_type;default:'yjs-binary'" json:"content_type"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 

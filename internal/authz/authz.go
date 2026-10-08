@@ -53,6 +53,21 @@ func (a *Authorization) CanManageProject(ctx context.Context, userID, projectID 
 	return member != nil && ProjectRole(member.Role) == RoleOwner, nil
 }
 
+// CanAddMembers checks if a user can add members to a project (owner or editor).
+func (a *Authorization) CanAddMembers(ctx context.Context, userID, projectID uuid.UUID) (bool, error) {
+	member, err := a.memberProvider.FindByProjectAndUser(ctx, projectID, userID)
+	if err != nil {
+		return false, err
+	}
+
+	if member == nil {
+		return false, nil
+	}
+
+	role := ProjectRole(member.Role)
+	return role == RoleOwner || role == RoleEditor, nil
+}
+
 // CanEditFile checks if a user can edit files in a project (owner/editor).
 func (a *Authorization) CanEditFile(ctx context.Context, userID, projectID uuid.UUID) (bool, error) {
 	member, err := a.memberProvider.FindByProjectAndUser(ctx, projectID, userID)

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/base64"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -28,10 +29,12 @@ type CreateFileRequest struct {
 
 // UpdateFileRequest represents an update file request.
 type UpdateFileRequest struct {
-	Name     *string `json:"name,omitempty"`
-	Path     *string `json:"path,omitempty"`
-	Language *string `json:"language,omitempty"`
-	Content  *[]byte `json:"content,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Path        *string `json:"path,omitempty"`
+	Language    *string `json:"language,omitempty"`
+	Content     *[]byte `json:"content,omitempty"`
+	ContentB64  *string `json:"content_base64,omitempty"`
+	ContentText *string `json:"content_text,omitempty"`
 }
 
 // Create handles file creation.
@@ -142,10 +145,20 @@ func (h *FileHandler) Update(c *gin.Context) {
 	}
 
 	updates := service.FileUpdates{
-		Name:     req.Name,
-		Path:     req.Path,
-		Language: req.Language,
-		Content:  req.Content,
+		Name:        req.Name,
+		Path:        req.Path,
+		Language:    req.Language,
+		Content:     req.Content,
+		ContentText: req.ContentText,
+	}
+
+	if req.ContentB64 != nil {
+		decoded, err := base64.StdEncoding.DecodeString(*req.ContentB64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid content_base64"})
+			return
+		}
+		updates.Content = &decoded
 	}
 
 	file, err := h.fileService.Update(c.Request.Context(), fileID, userID, updates)
@@ -159,6 +172,38 @@ func (h *FileHandler) Update(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, file)
+}
+
+// GetContent returns the plain-text content of a file.
+func (h *FileHandler) GetContent(c *gin.Context) {
+	userID, err := getCurrentUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	fileID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file id"})
+		return
+	}
+
+	file, err := h.fileService.GetByID(c.Request.Context(), fileID, userID)
+	if err != nil {
+		status := http.StatusNotFound
+		if err.Error() == "access denied" {
+			status = http.StatusForbidden
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+
+	content := ""
+	if file.ContentText != nil {
+		content = *file.ContentText
+	}
+
+	c.JSON(http.StatusOK, gin.H{"content": content})
 }
 
 // Delete handles deleting a file.

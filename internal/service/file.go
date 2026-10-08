@@ -69,12 +69,14 @@ func (s *FileService) Create(ctx context.Context, projectID, userID uuid.UUID, n
 		return nil, errors.New("file with this path already exists")
 	}
 
+	emptyText := ""
 	file := &models.File{
 		ProjectID:   projectID,
 		Name:        name,
 		Path:        path,
 		Language:    language,
 		Content:     []byte{},
+		ContentText: &emptyText,
 		ContentType: "yjs-binary",
 	}
 
@@ -131,10 +133,11 @@ func (s *FileService) ListByProject(ctx context.Context, projectID, userID uuid.
 
 // FileUpdates represents fields that can be updated on a file.
 type FileUpdates struct {
-	Name     *string
-	Path     *string
-	Language *string
-	Content  *[]byte
+	Name        *string
+	Path        *string
+	Language    *string
+	Content     *[]byte
+	ContentText *string
 }
 
 // Update updates a file (owner/editor).
@@ -187,6 +190,10 @@ func (s *FileService) Update(ctx context.Context, fileID, userID uuid.UUID, upda
 		file.ContentType = "yjs-binary"
 	}
 
+	if updates.ContentText != nil {
+		file.ContentText = updates.ContentText
+	}
+
 	changedFields := []string{}
 	if updates.Name != nil {
 		changedFields = append(changedFields, "name")
@@ -199,6 +206,9 @@ func (s *FileService) Update(ctx context.Context, fileID, userID uuid.UUID, upda
 	}
 	if updates.Content != nil {
 		changedFields = append(changedFields, "content")
+	}
+	if updates.ContentText != nil {
+		changedFields = append(changedFields, "content_text")
 	}
 
 	if err := s.fileRepo.Update(ctx, file); err != nil {

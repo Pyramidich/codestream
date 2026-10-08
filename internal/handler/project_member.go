@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,13 +22,13 @@ func NewProjectMemberHandler(memberService *service.ProjectMemberService) *Proje
 
 // AddMemberRequest represents an request to add a member.
 type AddMemberRequest struct {
-	UserID string `json:"user_id" binding:"required"`
-	Role   string `json:"role" binding:"required"`
+	Email string `json:"email" binding:"required"`
+	Role  string `json:"role" binding:"required"`
 }
 
 // Add handles adding a member to a project.
 func (h *ProjectMemberHandler) Add(c *gin.Context) {
-	ownerID, err := getCurrentUserID(c)
+	currentUserID, err := getCurrentUserID(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -45,17 +46,18 @@ func (h *ProjectMemberHandler) Add(c *gin.Context) {
 		return
 	}
 
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
-		return
-	}
-
-	member, err := h.memberService.AddMember(c.Request.Context(), projectID, ownerID, userID, req.Role)
+	member, err := h.memberService.AddMember(c.Request.Context(), projectID, currentUserID, strings.ToLower(req.Email), req.Role)
 	if err != nil {
 		status := http.StatusUnprocessableEntity
-		if err.Error() == "only owner can add members" {
+		switch err.Error() {
+		case "user not found":
+			status = http.StatusNotFound
+		case "user is already a member":
+			status = http.StatusConflict
+		case "only owner or editor can add members":
 			status = http.StatusForbidden
+		case "invalid role", "invalid email", "cannot add yourself":
+			status = http.StatusBadRequest
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
@@ -113,8 +115,11 @@ func (h *ProjectMemberHandler) Remove(c *gin.Context) {
 
 	if err := h.memberService.RemoveMember(c.Request.Context(), projectID, ownerID, userID); err != nil {
 		status := http.StatusUnprocessableEntity
-		if err.Error() == "only owner can remove members" {
+		switch err.Error() {
+		case "only owner can remove members":
 			status = http.StatusForbidden
+		case "member not found":
+			status = http.StatusNotFound
 		}
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
