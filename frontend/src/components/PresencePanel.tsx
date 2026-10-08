@@ -11,6 +11,15 @@ const PresencePanel: React.FC<PresencePanelProps> = ({ users = [] }) => {
       <p className="text-sm text-gray-600">
         Users online: {users.length}
       </p>
+      {users.length > 0 && (
+        <ul className="mt-2 space-y-1 max-h-32 overflow-auto">
+          {users.map((userId) => (
+            <li key={userId} className="text-xs text-gray-500 font-mono truncate">
+              {userId}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

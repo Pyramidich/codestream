@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import MonacoEditor from '@monaco-editor/react'
 import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
@@ -6,6 +6,7 @@ import type { editor as monacoEditor } from 'monaco-editor'
 import type { Awareness } from 'y-protocols/awareness'
 import { CodestreamProvider, base64ToArrayBuffer } from '../providers/websocket'
 import type { WebSocketMessage } from '../providers/websocket'
+import PresencePanel from './PresencePanel'
 import { getAccessToken } from '../api/client'
 
 interface EditorProps {
@@ -18,6 +19,7 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
   const providerRef = useRef<CodestreamProvider | null>(null)
   const bindingRef = useRef<MonacoBinding | null>(null)
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([])
 
   useEffect(() => {
     const token = getAccessToken()
@@ -50,6 +52,27 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
           } catch {
             // ignore invalid update
           }
+        }
+      } else if (message.event === 'user:joined') {
+        const payload = message.data as { userId?: string }
+        if (payload.userId) {
+          setOnlineUsers((prev) =>
+            prev.includes(payload.userId as string)
+              ? prev
+              : [...prev, payload.userId as string],
+          )
+        }
+      } else if (message.event === 'user:left') {
+        const payload = message.data as { userId?: string }
+        if (payload.userId) {
+          setOnlineUsers((prev) =>
+            prev.filter((id) => id !== payload.userId),
+          )
+        }
+      } else if (message.event === 'presence:list') {
+        const payload = message.data as { users?: string[] }
+        if (Array.isArray(payload.users)) {
+          setOnlineUsers(payload.users)
         }
       }
     })
@@ -98,16 +121,21 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
   }
 
   return (
-    <div className="h-[600px] border border-gray-300 rounded-md overflow-hidden">
-      <MonacoEditor
-        defaultLanguage="javascript"
-        theme="vs-light"
-        onMount={handleEditorMount}
-        options={{
-          automaticLayout: true,
-          minimap: { enabled: false },
-        }}
-      />
+    <div>
+      <div className="mb-2 flex justify-end">
+        <PresencePanel users={onlineUsers} />
+      </div>
+      <div className="h-[600px] border border-gray-300 rounded-md overflow-hidden">
+        <MonacoEditor
+          defaultLanguage="javascript"
+          theme="vs-light"
+          onMount={handleEditorMount}
+          options={{
+            automaticLayout: true,
+            minimap: { enabled: false },
+          }}
+        />
+      </div>
     </div>
   )
 }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import Editor from '../components/Editor'
-import PresencePanel from '../components/PresencePanel'
 import { filesApi } from '../api/files'
 import type { ProjectFile } from '../types'
 
@@ -36,7 +35,6 @@ const EditorPage: React.FC = () => {
             Project: {projectId} {file?.path ? `• ${file.path}` : ''}
           </p>
         </div>
-        <PresencePanel />
       </div>
 
       {error && (
