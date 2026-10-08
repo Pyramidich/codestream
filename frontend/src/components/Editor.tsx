@@ -67,10 +67,18 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
     provider.sendJoin(stateVector)
 
     return () => {
-      yDocRef.current.off('update', handleUpdate)
-      bindingRef.current?.destroy()
-      provider.sendLeave()
-      provider.disconnect()
+      // Delay disconnect to survive React StrictMode's immediate remount.
+      const p = provider
+      setTimeout(() => {
+        if (providerRef.current === p) {
+          yDocRef.current.off('update', handleUpdate)
+          bindingRef.current?.destroy()
+          bindingRef.current = null
+          p.sendLeave()
+          p.disconnect()
+          providerRef.current = null
+        }
+      }, 100)
     }
   }, [fileId])
 
