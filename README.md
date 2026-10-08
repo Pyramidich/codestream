@@ -9,6 +9,7 @@ CodeStream — pet-проект, демонстрирующий real-time сов
 ## Стек
 
 - **Backend**: Go 1.27, Gin, GORM
+- **Frontend**: Vite + React + TypeScript + Tailwind CSS
 - **База данных**: PostgreSQL 16
 - **Кэш / pub-sub**: Redis 7
 - **Real-time**: WebSocket (`gorilla/websocket`)
@@ -18,7 +19,8 @@ CodeStream — pet-проект, демонстрирующий real-time сов
 
 ## Статус
 
-MVP backend завершён. Реализованы: аутентификация (JWT + refresh tokens), проекты, участники, файлы, WebSocket foundation, collaborative editing, change history, CI/CD.
+MVP backend завершён. Frontend bootstrap создан (Vite + React + TypeScript + Tailwind CSS).
+Реализованы: аутентификация (JWT + refresh tokens), проекты, участники, файлы, WebSocket foundation, collaborative editing, change history, CI/CD.
 
 ## Запуск
 
@@ -48,6 +50,14 @@ make ci
 - `make fmt` — форматировать код.
 - `make ci` — запустить CI-проверки.
 - `make migrate-up` — применить миграции.
+
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Архитектура
 
