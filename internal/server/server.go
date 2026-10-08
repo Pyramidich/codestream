@@ -82,7 +82,7 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 	projectHandler := handler.NewProjectHandler(projectService)
 	memberHandler := handler.NewProjectMemberHandler(memberService)
 	fileHandler := handler.NewFileHandler(fileService)
-	wsHandler := handler.NewWSHandler(hub, fileService, documentStateManager, cfg.JWTSecret, logger)
+	wsHandler := handler.NewWSHandler(hub, fileService, documentStateManager, userRepo, cfg.JWTSecret, logger)
 
 	authMW := middleware.AuthMiddleware(cfg.JWTSecret)
 
@@ -147,6 +147,7 @@ func (s *Server) setupRoutes(
 		authorized.POST("/projects/:id/files", fileHandler.Create)
 		authorized.GET("/projects/:id/files", fileHandler.List)
 		authorized.GET("/files/:id", fileHandler.Get)
+		authorized.GET("/files/:id/content", fileHandler.GetContent)
 		authorized.PATCH("/files/:id", fileHandler.Update)
 		authorized.DELETE("/files/:id", fileHandler.Delete)
 	}

@@ -22,6 +22,11 @@ type FileServiceForWS interface {
 	GetByID(ctx context.Context, fileID, userID uuid.UUID) (*models.File, error)
 }
 
+// UserFinderForWS defines the user lookup interface needed by WSHandler.
+type UserFinderForWS interface {
+	FindByID(ctx context.Context, id uuid.UUID) (*models.User, error)
+}
+
 // DocumentStateManagerForWS defines the document state manager interface needed by WSHandler.
 type DocumentStateManagerForWS interface {
 	ApplyUpdate(ctx context.Context, fileID, userID uuid.UUID, update []byte) error
@@ -32,18 +37,20 @@ type DocumentStateManagerForWS interface {
 
 // WSHandler handles WebSocket connections.
 type WSHandler struct {
-	hub                 *ws.Hub
-	fileService         FileServiceForWS
+	hub                  *ws.Hub
+	fileService          FileServiceForWS
+	userFinder           UserFinderForWS
 	documentStateManager DocumentStateManagerForWS
-	jwtSecret           string
-	logger              *slog.Logger
+	jwtSecret            string
+	logger               *slog.Logger
 }
 
 // NewWSHandler creates a new WSHandler.
-func NewWSHandler(hub *ws.Hub, fileService FileServiceForWS, documentStateManager DocumentStateManagerForWS, jwtSecret string, logger *slog.Logger) *WSHandler {
+func NewWSHandler(hub *ws.Hub, fileService FileServiceForWS, documentStateManager DocumentStateManagerForWS, userFinder UserFinderForWS, jwtSecret string, logger *slog.Logger) *WSHandler {
 	return &WSHandler{
 		hub:                  hub,
 		fileService:          fileService,
+		userFinder:           userFinder,
 		documentStateManager: documentStateManager,
 		jwtSecret:            jwtSecret,
 		logger:               logger,
@@ -191,6 +198,32 @@ func (h *WSHandler) handleMessage(connection *ws.Connection, fileID, userID uuid
 		if err := h.documentStateManager.ApplyUpdate(context.Background(), fileID, userID, update); err != nil {
 			h.logger.Warn("failed to apply update", slog.String("error", err.Error()))
 		}
+
+	case ws.EventAwarenessUpdate:
+		var data map[string]interface{}
+		if err := json.Unmarshal(msg.Data, &data); err != nil {
+			h.logger.Warn("invalid awareness:update data", slog.String("error", err.Error()))
+			return
+		}
+
+		displayName := userID.String()
+		if h.userFinder != nil {
+			user, err := h.userFinder.FindByID(context.Background(), userID)
+			if err == nil && user != nil && user.DisplayName != "" {
+				displayName = user.DisplayName
+			}
+		}
+
+		data["userId"] = userID.String()
+		data["displayName"] = displayName
+
+		out, err := json.Marshal(ws.WSMessage{Event: ws.EventAwarenessUpdate, Data: mustJSON(data)})
+		if err != nil {
+			h.logger.Warn("failed to marshal awareness:update", slog.String("error", err.Error()))
+			return
+		}
+
+		h.hub.Broadcast(connection.RoomID, out, connection.ID)
 
 	case ws.EventPong:
 		// Heartbeat handled by connection pong handler

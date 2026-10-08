@@ -3,12 +3,13 @@ import MonacoEditor from '@monaco-editor/react'
 import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
 import type { editor as monacoEditor } from 'monaco-editor'
-import type { Awareness } from 'y-protocols/awareness'
 import { CodestreamProvider, base64ToArrayBuffer } from '../providers/websocket'
 import type { WebSocketMessage } from '../providers/websocket'
-import PresencePanel from './PresencePanel'
+import PresencePanel, { type PresenceUser } from './PresencePanel'
 import { getAccessToken } from '../api/client'
 import { filesApi } from '../api/files'
+import { useAuth } from '../contexts/AuthContext'
+import { getUserColor } from '../utils/colors'
 
 interface EditorProps {
   fileId: string
@@ -17,12 +18,21 @@ interface EditorProps {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
+interface AwarenessUserState {
+  user?: {
+    id?: string
+    name?: string
+    color?: string
+  }
+}
+
 const Editor: React.FC<EditorProps> = ({ fileId }) => {
+  const { user } = useAuth()
   const yDocRef = useRef(new Y.Doc())
   const providerRef = useRef<CodestreamProvider | null>(null)
   const bindingRef = useRef<MonacoBinding | null>(null)
   const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([])
+  const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -48,8 +58,24 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
       }
 
       const url = `ws://localhost:8080/ws?token=${encodeURIComponent(token)}&file_id=${encodeURIComponent(fileId)}`
-      const provider = new CodestreamProvider(url, fileId)
+      const provider = new CodestreamProvider(url, fileId, yDocRef.current)
       providerRef.current = provider
+
+      const awareness = provider.getAwareness()
+
+      const updatePresenceFromAwareness = () => {
+        const states = Array.from(awareness.getStates().values()) as AwarenessUserState[]
+        const users: PresenceUser[] = []
+        for (const state of states) {
+          const u = state.user
+          if (u?.id && u.name && u.color) {
+            users.push({ userId: u.id, displayName: u.name, color: u.color })
+          }
+        }
+        setOnlineUsers(users)
+      }
+
+      awareness.on('change', updatePresenceFromAwareness)
 
       provider.onMessage((message: WebSocketMessage) => {
         if (message.event === 'doc:sync') {
@@ -74,24 +100,30 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
           }
         } else if (message.event === 'user:joined') {
           const payload = message.data as { userId?: string }
-          if (payload.userId) {
+          const joinedUserId = payload.userId
+          if (joinedUserId) {
             setOnlineUsers((prev) =>
-              prev.includes(payload.userId as string)
+              prev.some((u) => u.userId === joinedUserId)
                 ? prev
-                : [...prev, payload.userId as string],
+                : [...prev, { userId: joinedUserId, displayName: joinedUserId, color: getUserColor(joinedUserId) }],
             )
           }
         } else if (message.event === 'user:left') {
           const payload = message.data as { userId?: string }
-          if (payload.userId) {
-            setOnlineUsers((prev) =>
-              prev.filter((id) => id !== payload.userId),
-            )
+          const leftUserId = payload.userId
+          if (leftUserId) {
+            setOnlineUsers((prev) => prev.filter((u) => u.userId !== leftUserId))
           }
         } else if (message.event === 'presence:list') {
           const payload = message.data as { users?: string[] }
           if (Array.isArray(payload.users)) {
-            setOnlineUsers(payload.users)
+            setOnlineUsers(
+              payload.users.map((userId) => ({
+                userId,
+                displayName: userId,
+                color: getUserColor(userId),
+              })),
+            )
           }
         }
       })
@@ -111,6 +143,7 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
       setIsLoading(false)
 
       return () => {
+        awareness.off('change', updatePresenceFromAwareness)
         yDocRef.current.off('update', handleUpdate)
         bindingRef.current?.destroy()
         bindingRef.current = null
@@ -156,12 +189,50 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
     const model = editor.getModel()
     if (!model) return
 
+    const provider = providerRef.current
+    if (!provider) return
+
+    const awareness = provider.getAwareness()
+
     bindingRef.current = new MonacoBinding(
       yText,
       model,
       new Set([editor]),
-      undefined as Awareness | undefined,
+      awareness,
     )
+
+    const updateAwareness = () => {
+      const selection = editor.getSelection()
+      const position = editor.getPosition()
+      const state: Record<string, unknown> = {
+        user: {
+          id: user?.id ?? 'unknown',
+          name: user?.display_name || user?.email || user?.id || 'Unknown',
+          color: getUserColor(user?.id ?? 'unknown'),
+        },
+        cursor: position
+          ? {
+              lineNumber: position.lineNumber,
+              column: position.column,
+            }
+          : null,
+        selection: selection
+          ? {
+              startLineNumber: selection.startLineNumber,
+              startColumn: selection.startColumn,
+              endLineNumber: selection.endLineNumber,
+              endColumn: selection.endColumn,
+            }
+          : null,
+      }
+      awareness.setLocalState(state)
+      provider.sendAwarenessUpdate()
+    }
+
+    updateAwareness()
+
+    const disposeCursor = editor.onDidChangeCursorPosition(updateAwareness)
+    const disposeSelection = editor.onDidChangeCursorSelection(updateAwareness)
 
     editor.onKeyDown((e) => {
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
@@ -170,6 +241,11 @@ const Editor: React.FC<EditorProps> = ({ fileId }) => {
         void saveContent()
       }
     })
+
+    return () => {
+      disposeCursor.dispose()
+      disposeSelection.dispose()
+    }
   }
 
   const statusText = {

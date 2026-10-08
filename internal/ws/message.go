@@ -10,14 +10,15 @@ type WSMessage struct {
 
 // Event types.
 const (
-	EventJoinFile     = "join:file"
-	EventLeaveFile    = "leave:file"
-	EventJoinedFile   = "joined:file"
-	EventUserJoined   = "user:joined"
-	EventUserLeft     = "user:left"
-	EventPing         = "ping"
-	EventPong         = "pong"
-	EventDocUpdate    = "doc:update"
-	EventDocSync      = "doc:sync"
-	EventPresence     = "presence:list"
+	EventJoinFile        = "join:file"
+	EventLeaveFile       = "leave:file"
+	EventJoinedFile      = "joined:file"
+	EventUserJoined      = "user:joined"
+	EventUserLeft        = "user:left"
+	EventPing            = "ping"
+	EventPong            = "pong"
+	EventDocUpdate       = "doc:update"
+	EventDocSync         = "doc:sync"
+	EventAwarenessUpdate = "awareness:update"
+	EventPresence        = "presence:list"
 )

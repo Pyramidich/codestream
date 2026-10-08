@@ -1,3 +1,6 @@
+import * as Y from 'yjs'
+import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from 'y-protocols/awareness'
+
 export interface WebSocketMessage {
   event: string
   data: Record<string, unknown>
@@ -12,10 +15,46 @@ export class CodestreamProvider {
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null
   private messageListeners: Array<(message: WebSocketMessage) => void> = []
   private shouldReconnect = true
+  private yDoc: Y.Doc
+  private awareness: Awareness
 
-  constructor(url: string, fileId: string) {
+  constructor(url: string, fileId: string, yDoc: Y.Doc) {
     this.url = url
     this.fileId = fileId
+    this.yDoc = yDoc
+    this.awareness = new Awareness(this.yDoc)
+  }
+
+  getAwareness(): Awareness {
+    return this.awareness
+  }
+
+  setLocalState(state: Record<string, unknown> | null) {
+    this.awareness.setLocalState(state)
+  }
+
+  onAwarenessChange(callback: () => void) {
+    this.awareness.on('change', callback)
+    return () => {
+      this.awareness.off('change', callback)
+    }
+  }
+
+  sendAwarenessUpdate() {
+    const update = encodeAwarenessUpdate(this.awareness, [this.awareness.clientID])
+    this.send('awareness:update', {
+      fileId: this.fileId,
+      update: arrayBufferToBase64(update),
+    })
+  }
+
+  applyAwarenessUpdate(updateBase64: string) {
+    try {
+      const update = base64ToArrayBuffer(updateBase64)
+      applyAwarenessUpdate(this.awareness, update, 'remote')
+    } catch {
+      // ignore invalid awareness update
+    }
   }
 
   connect() {
@@ -65,6 +104,14 @@ export class CodestreamProvider {
   private handleServerMessage(message: WebSocketMessage) {
     if (message.event === 'ping') {
       this.sendPong()
+      return
+    }
+
+    if (message.event === 'awareness:update') {
+      const payload = message.data as { update?: string }
+      if (payload.update) {
+        this.applyAwarenessUpdate(payload.update)
+      }
       return
     }
 
