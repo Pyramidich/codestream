@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import gsap from 'gsap'
 import { useAuth } from '../contexts/AuthContext'
+import { prefersReducedMotion } from '../utils/animations'
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -9,6 +11,50 @@ const LoginPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const cardRef = useRef<HTMLDivElement>(null)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  useEffect(() => {
+    if (!cardRef.current) return
+    if (prefersReducedMotion()) {
+      gsap.set(cardRef.current, { opacity: 1, y: 0 })
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        cardRef.current,
+        { y: 40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, ease: 'power2.out' }
+      )
+    }, cardRef)
+
+    return () => ctx.revert()
+  }, [])
+
+  const handleInputEnter = (e: React.MouseEvent<HTMLInputElement>) => {
+    gsap.to(e.currentTarget, {
+      borderColor: '#624EC2',
+      duration: 0.2,
+      ease: 'power2.out',
+    })
+  }
+
+  const handleInputLeave = (e: React.MouseEvent<HTMLInputElement>) => {
+    gsap.to(e.currentTarget, {
+      borderColor: '#3A3A3A',
+      duration: 0.2,
+      ease: 'power2.out',
+    })
+  }
+
+  const handleSubmitEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    gsap.to(e.currentTarget, { scale: 1.02, duration: 0.2, ease: 'power2.out' })
+  }
+
+  const handleSubmitLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    gsap.to(e.currentTarget, { scale: 1, duration: 0.2, ease: 'power2.out' })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,56 +73,67 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Login</h2>
+      <div
+        ref={cardRef}
+        className="w-full max-w-md bg-[#2A2A2A] rounded-lg shadow-md p-8 border border-[#3A3A3A]"
+      >
+        <h2 className="text-2xl font-bold text-[#F5F0EA] mb-6 text-center">Login</h2>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md text-sm">
+          <div className="mb-4 p-3 bg-red-900/20 text-red-400 rounded-md text-sm">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="email" className="block text-sm font-medium text-[#A0A0A0]">
               Email
             </label>
             <input
+              ref={(el) => { inputRefs.current[0] = el }}
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+              onMouseEnter={handleInputEnter}
+              onMouseLeave={handleInputLeave}
+              className="mt-1 block w-full rounded-md border-[#3A3A3A] bg-[#202020] text-[#F5F0EA] shadow-sm focus:border-[#624EC2] focus:ring-[#624EC2] sm:text-sm px-3 py-2 border"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-[#A0A0A0]">
               Password
             </label>
             <input
+              ref={(el) => { inputRefs.current[1] = el }}
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+              onMouseEnter={handleInputEnter}
+              onMouseLeave={handleInputLeave}
+              className="mt-1 block w-full rounded-md border-[#3A3A3A] bg-[#202020] text-[#F5F0EA] shadow-sm focus:border-[#624EC2] focus:ring-[#624EC2] sm:text-sm px-3 py-2 border"
             />
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            onMouseEnter={handleSubmitEnter}
+            onMouseLeave={handleSubmitLeave}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#624EC2] hover:bg-[#7B68D1] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#624EC2] disabled:opacity-50"
           >
             {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-[#A0A0A0]">
           Don&apos;t have an account?{' '}
-          <Link to="/register" className="text-indigo-600 hover:text-indigo-500">
+          <Link to="/register" className="text-[#624EC2] hover:text-[#7B68D1]">
             Register
           </Link>
         </p>

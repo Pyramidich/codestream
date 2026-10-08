@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import gsap from 'gsap'
 import { projectsApi } from '../api/projects'
 import { filesApi } from '../api/files'
 import { useAuth } from '../contexts/AuthContext'
 import { detectLanguage, LANGUAGE_OPTIONS } from '../utils/language'
 import type { Project as ProjectType, ProjectFile, ProjectMember } from '../types'
+import { prefersReducedMotion } from '../utils/animations'
 
 const ProjectPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +24,8 @@ const ProjectPage: React.FC = () => {
     language: '',
   })
   const [isCreating, setIsCreating] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
 
   const fetchProject = async () => {
     if (!id) return
@@ -53,6 +57,41 @@ const ProjectPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
+  useEffect(() => {
+    if (isLoading) return
+    if (!containerRef.current) return
+    if (prefersReducedMotion()) {
+      gsap.set(containerRef.current, { opacity: 1, y: 0 })
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        containerRef.current,
+        { y: 20, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, ease: 'power2.out' }
+      )
+    })
+    return () => ctx.revert()
+  }, [isLoading])
+
+  useEffect(() => {
+    if (!isModalOpen || !modalRef.current) return
+    if (prefersReducedMotion()) {
+      gsap.set(modalRef.current, { opacity: 1, scale: 1 })
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        modalRef.current,
+        { scale: 0.95, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.3, ease: 'power2.out' }
+      )
+    })
+    return () => ctx.revert()
+  }, [isModalOpen])
+
   const currentUserRole =
     user && members.find((m) => m.user_id === user.id)?.role
 
@@ -77,27 +116,43 @@ const ProjectPage: React.FC = () => {
     }
   }
 
+  const handleRowEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    gsap.to(e.currentTarget, {
+      backgroundColor: '#333333',
+      duration: 0.2,
+      ease: 'power2.out',
+    })
+  }
+
+  const handleRowLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    gsap.to(e.currentTarget, {
+      backgroundColor: 'transparent',
+      duration: 0.2,
+      ease: 'power2.out',
+    })
+  }
+
   return (
-    <div className="h-full">
+    <div ref={containerRef} className="h-full">
       {isLoading ? (
-        <p className="text-gray-600">Loading...</p>
+        <p className="text-[#A0A0A0]">Loading...</p>
       ) : error ? (
-        <div className="p-4 bg-red-50 text-red-700 rounded-md">{error}</div>
+        <div className="p-4 bg-red-900/20 text-red-400 rounded-md">{error}</div>
       ) : (
         <>
           <div className="flex items-center justify-between mb-6">
             <div>
               <button
                 onClick={() => navigate('/projects')}
-                className="text-sm text-indigo-600 hover:text-indigo-500 mb-2"
+                className="text-sm text-[#624EC2] hover:text-[#7B68D1] mb-2"
               >
                 ← Back to projects
               </button>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-3xl font-bold text-[#F5F0EA]">
                 {project?.name}
               </h1>
               {currentUserRole && (
-                <p className="text-sm text-gray-500 mt-1 capitalize">
+                <p className="text-sm text-[#A0A0A0] mt-1 capitalize">
                   Your role: {currentUserRole}
                 </p>
               )}
@@ -105,14 +160,14 @@ const ProjectPage: React.FC = () => {
             <div className="flex items-center gap-3">
               <Link
                 to={`/projects/${id}/settings`}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="inline-flex items-center px-4 py-2 border border-[#3A3A3A] text-sm font-medium rounded-md text-[#F5F0EA] bg-transparent hover:bg-[#2A2A2A]"
               >
                 Settings
               </Link>
               {currentUserRole !== 'viewer' && (
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#624EC2] hover:bg-[#7B68D1]"
                 >
                   Create File
                 </button>
@@ -122,22 +177,24 @@ const ProjectPage: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
+              <div className="bg-[#2A2A2A] rounded-lg shadow-sm border border-[#3A3A3A] p-4">
+                <h2 className="text-lg font-semibold text-[#F5F0EA] mb-4">
                   Files
                 </h2>
                 {files.length === 0 ? (
-                  <p className="text-gray-600 text-sm">No files yet.</p>
+                  <p className="text-[#A0A0A0] text-sm">No files yet.</p>
                 ) : (
                   <ul className="space-y-1">
                     {files.map((file) => (
                       <li key={file.id}>
                         <Link
                           to={`/projects/${id}/files/${file.id}`}
-                          className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-100"
+                          onMouseEnter={handleRowEnter}
+                          onMouseLeave={handleRowLeave}
+                          className="block px-3 py-2 rounded-md text-sm text-[#F5F0EA]"
                         >
                           <span className="font-medium">{file.name}</span>
-                          <span className="block text-xs text-gray-500">
+                          <span className="block text-xs text-[#A0A0A0]">
                             {file.path}
                           </span>
                         </Link>
@@ -147,12 +204,12 @@ const ProjectPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              <div className="mt-6 bg-[#2A2A2A] rounded-lg shadow-sm border border-[#3A3A3A] p-4">
+                <h2 className="text-lg font-semibold text-[#F5F0EA] mb-2">
                   Members
                 </h2>
                 {members.length === 0 ? (
-                  <p className="text-sm text-gray-600">No members yet.</p>
+                  <p className="text-sm text-[#A0A0A0]">No members yet.</p>
                 ) : (
                   <ul className="space-y-2">
                     {members.map((member) => (
@@ -160,10 +217,10 @@ const ProjectPage: React.FC = () => {
                         key={member.user_id}
                         className="flex items-center justify-between text-sm"
                       >
-                        <span className="text-gray-700 truncate">
+                        <span className="text-[#F5F0EA] truncate">
                           {member.display_name || member.email}
                         </span>
-                        <span className="text-xs text-gray-500 capitalize">
+                        <span className="text-xs text-[#A0A0A0] capitalize">
                           {member.role}
                         </span>
                       </li>
@@ -172,7 +229,7 @@ const ProjectPage: React.FC = () => {
                 )}
                 <Link
                   to={`/projects/${id}/settings`}
-                  className="mt-3 inline-block text-sm text-indigo-600 hover:text-indigo-500"
+                  className="mt-3 inline-block text-sm text-[#624EC2] hover:text-[#7B68D1]"
                 >
                   Manage members →
                 </Link>
@@ -180,8 +237,8 @@ const ProjectPage: React.FC = () => {
             </div>
 
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-                <p className="text-gray-600">
+              <div className="bg-[#2A2A2A] rounded-lg shadow-sm border border-[#3A3A3A] p-8 text-center">
+                <p className="text-[#A0A0A0]">
                   Select a file to open the editor
                 </p>
               </div>
@@ -192,15 +249,18 @@ const ProjectPage: React.FC = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
+          <div
+            ref={modalRef}
+            className="bg-[#2A2A2A] rounded-lg shadow-lg p-6 w-full max-w-md border border-[#3A3A3A]"
+          >
+            <h2 className="text-xl font-bold text-[#F5F0EA] mb-4">
               Create File
             </h2>
             <form onSubmit={handleCreateFile} className="space-y-4">
               <div>
                 <label
                   htmlFor="fileName"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-[#A0A0A0]"
                 >
                   Name
                 </label>
@@ -212,13 +272,13 @@ const ProjectPage: React.FC = () => {
                     setNewFile({ ...newFile, name: e.target.value })
                   }
                   required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                  className="mt-1 block w-full rounded-md border-[#3A3A3A] bg-[#202020] text-[#F5F0EA] shadow-sm focus:border-[#624EC2] focus:ring-[#624EC2] sm:text-sm px-3 py-2 border"
                 />
               </div>
               <div>
                 <label
                   htmlFor="filePath"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-[#A0A0A0]"
                 >
                   Path
                 </label>
@@ -230,13 +290,13 @@ const ProjectPage: React.FC = () => {
                     setNewFile({ ...newFile, path: e.target.value })
                   }
                   required
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                  className="mt-1 block w-full rounded-md border-[#3A3A3A] bg-[#202020] text-[#F5F0EA] shadow-sm focus:border-[#624EC2] focus:ring-[#624EC2] sm:text-sm px-3 py-2 border"
                 />
               </div>
               <div>
                 <label
                   htmlFor="fileLanguage"
-                  className="block text-sm font-medium text-gray-700"
+                  className="block text-sm font-medium text-[#A0A0A0]"
                 >
                   Language
                 </label>
@@ -246,7 +306,7 @@ const ProjectPage: React.FC = () => {
                   onChange={(e) =>
                     setNewFile({ ...newFile, language: e.target.value })
                   }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
+                  className="mt-1 block w-full rounded-md border-[#3A3A3A] bg-[#202020] text-[#F5F0EA] shadow-sm focus:border-[#624EC2] focus:ring-[#624EC2] sm:text-sm px-3 py-2 border"
                 >
                   {LANGUAGE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -259,14 +319,14 @@ const ProjectPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="px-4 py-2 border border-[#3A3A3A] rounded-md text-sm font-medium text-[#F5F0EA] bg-transparent hover:bg-[#202020]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-[#624EC2] hover:bg-[#7B68D1] disabled:opacity-50"
                 >
                   {isCreating ? 'Creating...' : 'Create'}
                 </button>

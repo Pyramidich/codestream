@@ -3,6 +3,7 @@ import MonacoEditor from '@monaco-editor/react'
 import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
 import type { editor as monacoEditor } from 'monaco-editor'
+import gsap from 'gsap'
 import { CodestreamProvider, base64ToArrayBuffer } from '../providers/websocket'
 import type { WebSocketMessage } from '../providers/websocket'
 import PresencePanel, { type PresenceUser } from './PresencePanel'
@@ -10,6 +11,7 @@ import { getAccessToken } from '../api/client'
 import { filesApi } from '../api/files'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserColor } from '../utils/colors'
+import { prefersReducedMotion } from '../utils/animations'
 
 interface EditorProps {
   fileId: string
@@ -36,6 +38,8 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isLoading, setIsLoading] = useState(true)
+  const statusRef = useRef<HTMLSpanElement>(null)
+  const loadingRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = getAccessToken()
@@ -167,6 +171,50 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
     }
   }, [fileId])
 
+  useEffect(() => {
+    if (!loadingRef.current) return
+    if (prefersReducedMotion()) {
+      gsap.set(loadingRef.current, { opacity: 1 })
+      return
+    }
+    const tween = gsap.to(loadingRef.current, {
+      opacity: 0.5,
+      duration: 0.8,
+      yoyo: true,
+      repeat: -1,
+      ease: 'power2.inOut',
+    })
+    return () => {
+      tween.kill()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!statusRef.current) return
+    if (saveStatus === 'idle') return
+    if (prefersReducedMotion()) {
+      gsap.set(statusRef.current, { opacity: 1 })
+      return
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        statusRef.current,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.3, ease: 'power2.out' }
+      )
+      if (saveStatus === 'saved' || saveStatus === 'error') {
+        gsap.to(statusRef.current, {
+          opacity: 0,
+          duration: 0.3,
+          delay: 1.7,
+          ease: 'power2.out',
+        })
+      }
+    })
+    return () => ctx.revert()
+  }, [saveStatus])
+
   const saveContent = async () => {
     const editor = editorRef.current
     if (!editor) return
@@ -257,16 +305,19 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
   }
 
   const statusClass = {
-    idle: 'text-gray-400',
-    saving: 'text-yellow-600',
-    saved: 'text-green-600',
-    error: 'text-red-600',
+    idle: 'text-[#A0A0A0]',
+    saving: 'text-yellow-500',
+    saved: 'text-green-500',
+    error: 'text-red-400',
   }
 
   if (isLoading) {
     return (
-      <div className="h-[600px] flex items-center justify-center border border-gray-300 rounded-md">
-        <p className="text-gray-600">Loading...</p>
+      <div
+        ref={loadingRef}
+        className="h-[600px] flex items-center justify-center border border-[#3A3A3A] rounded-md bg-[#202020]"
+      >
+        <p className="text-[#A0A0A0]">Loading...</p>
       </div>
     )
   }
@@ -275,15 +326,18 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
     <div>
       <div className="mb-2 flex items-center justify-between">
         <PresencePanel users={onlineUsers} />
-        <span className={`text-sm font-medium ${statusClass[saveStatus]}`}>
+        <span
+          ref={statusRef}
+          className={`text-sm font-medium ${statusClass[saveStatus]}`}
+        >
           {statusText[saveStatus]}
         </span>
       </div>
-      <div className="h-[600px] border border-gray-300 rounded-md overflow-hidden">
+      <div className="h-[600px] border border-[#3A3A3A] rounded-md overflow-hidden">
         <MonacoEditor
           defaultLanguage={language || 'plaintext'}
           language={language || 'plaintext'}
-          theme="vs-light"
+          theme="vs-dark"
           onMount={handleEditorMount}
           options={{
             automaticLayout: true,
