@@ -19,5 +19,5 @@ const (
 	EventPong         = "pong"
 	EventDocUpdate    = "doc:update"
 	EventDocSync      = "doc:sync"
-	EventPresence     = "presence:update"
+	EventPresence     = "presence:list"
 )

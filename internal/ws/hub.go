@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/google/uuid"
@@ -30,6 +31,35 @@ func (h *Hub) Join(roomID string, conn *Connection) {
 	h.rooms[roomID][conn.ID] = conn
 
 	conn.RoomID = roomID
+}
+
+// BroadcastUserJoined sends a user:joined event to all room members except the new one.
+func (h *Hub) BroadcastUserJoined(roomID string, userID string, excludeConnID string) {
+	msg, err := json.Marshal(WSMessage{Event: EventUserJoined, Data: mustJSONMessage(map[string]string{"userId": userID})})
+	if err != nil {
+		return
+	}
+	h.Broadcast(roomID, msg, excludeConnID)
+}
+
+// BroadcastUserLeft sends a user:left event to all remaining room members.
+func (h *Hub) BroadcastUserLeft(roomID string, userID string, excludeConnID string) {
+	msg, err := json.Marshal(WSMessage{Event: EventUserLeft, Data: mustJSONMessage(map[string]string{"userId": userID})})
+	if err != nil {
+		return
+	}
+	h.Broadcast(roomID, msg, excludeConnID)
+}
+
+func mustJSONMessage(v interface{}) json.RawMessage {
+	if v == nil {
+		return json.RawMessage("{}")
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return json.RawMessage("{}")
+	}
+	return b
 }
 
 // Leave removes a connection from its room.

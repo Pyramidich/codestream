@@ -98,6 +98,18 @@ func (h *WSHandler) Handle(c *gin.Context) {
 
 	h.hub.Join(roomID, connection)
 
+	// Send the new connection the current list of online users in the room.
+	if users := h.hub.RoomUsers(roomID); len(users) > 0 {
+		userIDs := make([]string, 0, len(users))
+		for _, id := range users {
+			userIDs = append(userIDs, id.String())
+		}
+		connection.SendJSON(ws.EventPresence, map[string]interface{}{"users": userIDs})
+	}
+
+	// Notify existing room members that a new user joined.
+	h.hub.BroadcastUserJoined(roomID, userID.String(), connection.ID)
+
 	if err := h.documentStateManager.LoadSnapshot(c.Request.Context(), fileID); err != nil {
 		h.logger.Warn("failed to load snapshot", slog.String("error", err.Error()))
 	}
@@ -126,17 +138,18 @@ func (h *WSHandler) Handle(c *gin.Context) {
 }
 
 func (h *WSHandler) handleDisconnect(connection *ws.Connection) {
+	roomID := connection.RoomID
+	userID := connection.UserID
+
 	h.hub.Leave(connection.ID)
 
-	if connection.RoomID != "" {
-		h.hub.Broadcast(connection.RoomID, mustJSON(ws.WSMessage{
-			Event: ws.EventUserLeft,
-			Data:  mustJSON(map[string]string{"userId": connection.UserID}),
-		}), connection.ID)
+	if roomID != "" {
+		// Notify remaining room members that the user left.
+		h.hub.BroadcastUserLeft(roomID, userID, connection.ID)
 
 		// If room is empty, save snapshot
-		if h.hub.RoomCount(connection.RoomID) == 0 {
-			fileID, err := uuid.Parse(connection.RoomID[5:])
+		if h.hub.RoomCount(roomID) == 0 {
+			fileID, err := uuid.Parse(roomID[5:])
 			if err == nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
