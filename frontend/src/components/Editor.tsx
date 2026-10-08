@@ -3,15 +3,13 @@ import MonacoEditor from '@monaco-editor/react'
 import * as Y from 'yjs'
 import { MonacoBinding } from 'y-monaco'
 import type { editor as monacoEditor } from 'monaco-editor'
-import gsap from 'gsap'
 import { CodestreamProvider, base64ToArrayBuffer } from '../providers/websocket'
 import type { WebSocketMessage } from '../providers/websocket'
 import PresencePanel, { type PresenceUser } from './PresencePanel'
-import { getAccessToken } from '../api/client'
+import { API_URL, getAccessToken } from '../api/client'
 import { filesApi } from '../api/files'
 import { useAuth } from '../contexts/AuthContext'
 import { getUserColor } from '../utils/colors'
-import { prefersReducedMotion } from '../utils/animations'
 
 interface EditorProps {
   fileId: string
@@ -38,8 +36,6 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
   const [onlineUsers, setOnlineUsers] = useState<PresenceUser[]>([])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [isLoading, setIsLoading] = useState(true)
-  const statusRef = useRef<HTMLSpanElement>(null)
-  const loadingRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const token = getAccessToken()
@@ -62,7 +58,8 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
         yText.insert(0, initialContent)
       }
 
-      const url = `ws://localhost:8080/ws?token=${encodeURIComponent(token)}&file_id=${encodeURIComponent(fileId)}`
+      const wsBaseUrl = API_URL.replace(/^http/, 'ws')
+      const url = `${wsBaseUrl}/ws?token=${encodeURIComponent(token)}&file_id=${encodeURIComponent(fileId)}`
       const provider = new CodestreamProvider(url, fileId, yDocRef.current)
       providerRef.current = provider
 
@@ -127,7 +124,7 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
                 userId,
                 displayName: userId,
                 color: getUserColor(userId),
-              })),
+              }))
             )
           }
         }
@@ -155,7 +152,6 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
         provider.sendLeave()
         provider.disconnect()
         providerRef.current = null
-        yDocRef.current = new Y.Doc()
       }
     }
 
@@ -170,50 +166,6 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
       }
     }
   }, [fileId])
-
-  useEffect(() => {
-    if (!loadingRef.current) return
-    if (prefersReducedMotion()) {
-      gsap.set(loadingRef.current, { opacity: 1 })
-      return
-    }
-    const tween = gsap.to(loadingRef.current, {
-      opacity: 0.5,
-      duration: 0.8,
-      yoyo: true,
-      repeat: -1,
-      ease: 'power2.inOut',
-    })
-    return () => {
-      tween.kill()
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!statusRef.current) return
-    if (saveStatus === 'idle') return
-    if (prefersReducedMotion()) {
-      gsap.set(statusRef.current, { opacity: 1 })
-      return
-    }
-
-    const ctx = gsap.context(() => {
-      gsap.fromTo(
-        statusRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.3, ease: 'power2.out' }
-      )
-      if (saveStatus === 'saved' || saveStatus === 'error') {
-        gsap.to(statusRef.current, {
-          opacity: 0,
-          duration: 0.3,
-          delay: 1.7,
-          ease: 'power2.out',
-        })
-      }
-    })
-    return () => ctx.revert()
-  }, [saveStatus])
 
   const saveContent = async () => {
     const editor = editorRef.current
@@ -259,7 +211,7 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
           name: user?.display_name || user?.email || user?.id || 'Unknown',
           color: getUserColor(user?.id ?? 'unknown'),
         },
-        cursor: position
+          cursor: position
           ? {
               lineNumber: position.lineNumber,
               column: position.column,
@@ -313,10 +265,7 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
 
   if (isLoading) {
     return (
-      <div
-        ref={loadingRef}
-        className="h-[600px] flex items-center justify-center border border-[#3A3A3A] rounded-md bg-[#202020]"
-      >
+      <div className="h-[600px] flex items-center justify-center border border-[#3A3A3A] rounded-md bg-[#202020]">
         <p className="text-[#A0A0A0]">Loading...</p>
       </div>
     )
@@ -326,10 +275,7 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
     <div>
       <div className="mb-2 flex items-center justify-between">
         <PresencePanel users={onlineUsers} />
-        <span
-          ref={statusRef}
-          className={`text-sm font-medium ${statusClass[saveStatus]}`}
-        >
+        <span className={`text-sm font-medium ${statusClass[saveStatus]}`}>
           {statusText[saveStatus]}
         </span>
       </div>

@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"github.com/ilya/codestream/internal/authz"
@@ -28,7 +28,6 @@ type Server struct {
 	router      *gin.Engine
 	config      *config.Config
 	logger      *slog.Logger
-	redis       *redis.Client
 	userService UserService
 }
 
@@ -38,7 +37,7 @@ type UserService interface {
 }
 
 // New creates a new HTTP server with routes and middleware.
-func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db *gorm.DB) *Server {
+func New(cfg *config.Config, logger *slog.Logger, db *gorm.DB) *Server {
 	if cfg.AppEnv == "prod" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -49,7 +48,6 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 		router: router,
 		config: cfg,
 		logger: logger,
-		redis:  redisClient,
 	}
 
 	// Repositories
@@ -93,9 +91,14 @@ func New(cfg *config.Config, logger *slog.Logger, redisClient *redis.Client, db 
 }
 
 func (s *Server) setupMiddleware() {
+	origins := []string{"http://localhost:5173", "http://localhost:3000"}
+	if s.config.AllowOrigins != "" {
+		origins = strings.Split(s.config.AllowOrigins, ",")
+	}
+
 	s.router.Use(gin.Recovery())
 	s.router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -175,17 +178,6 @@ func (s *Server) handleHealth(c *gin.Context) {
 }
 
 func (s *Server) handleReady(c *gin.Context) {
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
-	defer cancel()
-
-	if s.redis != nil {
-		if err := s.redis.Ping(ctx).Err(); err != nil {
-			s.logger.Warn("redis readiness check failed", slog.String("error", err.Error()))
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not ready", "reason": "redis unavailable"})
-			return
-		}
-	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

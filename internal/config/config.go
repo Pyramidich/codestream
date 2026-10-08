@@ -14,11 +14,11 @@ type Config struct {
 	AppEnv       string        `envconfig:"APP_ENV" default:"dev"`
 	HTTPPort     string        `envconfig:"HTTP_PORT" default:"8080"`
 	DatabaseURL  string        `envconfig:"DATABASE_URL" required:"true"`
-	RedisURL     string        `envconfig:"REDIS_URL" required:"true"`
 	JWTSecret    string        `envconfig:"JWT_SECRET" required:"true"`
 	JWTAccessTTL time.Duration `envconfig:"JWT_ACCESS_TTL" default:"15m"`
 	JWTRefreshTTL time.Duration `envconfig:"JWT_REFRESH_TTL" default:"168h"`
 	LogLevel     string        `envconfig:"LOG_LEVEL" default:"info"`
+	AllowOrigins string        `envconfig:"ALLOW_ORIGINS" default:"http://localhost:5173"`
 }
 
 // Load reads configuration from environment variables and validates it.
@@ -47,10 +47,6 @@ func (c *Config) validate() error {
 
 	if c.DatabaseURL == "" {
 		return errors.New("DATABASE_URL is required")
-	}
-
-	if c.RedisURL == "" {
-		return errors.New("REDIS_URL is required")
 	}
 
 	if c.JWTSecret == "" {

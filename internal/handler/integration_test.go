@@ -18,7 +18,7 @@ func TestAuthFlow(t *testing.T) {
 	db := testutil.SetupTestDatabase(t)
 	testutil.CleanupTestDatabase(t, db)
 
-	server := testutil.NewTestServer(t, db, nil)
+	server := testutil.NewTestServer(t, db)
 	defer server.Close()
 
 	accessToken, _ := testutil.RegisterAndLogin(t, server)
@@ -33,7 +33,7 @@ func TestProjectAndFileFlow(t *testing.T) {
 	db := testutil.SetupTestDatabase(t)
 	testutil.CleanupTestDatabase(t, db)
 
-	server := testutil.NewTestServer(t, db, nil)
+	server := testutil.NewTestServer(t, db)
 	defer server.Close()
 
 	accessToken, _ := testutil.RegisterAndLogin(t, server)

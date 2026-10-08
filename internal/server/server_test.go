@@ -18,7 +18,7 @@ func TestHealthEndpoint(t *testing.T) {
 	cfg := &config.Config{AppEnv: "dev", HTTPPort: "8080", JWTAccessTTL: 15 * time.Minute, JWTRefreshTTL: 7 * 24 * time.Hour}
 	log := logger.New("dev", "info")
 
-	srv := server.New(cfg, log, nil, nil)
+	srv := server.New(cfg, log, nil)
 	w := httptest.NewRecorder()
 	req, err := http.NewRequest(http.MethodGet, "/health", nil)
 	require.NoError(t, err)

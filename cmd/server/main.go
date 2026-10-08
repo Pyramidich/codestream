@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
@@ -22,20 +21,13 @@ func main() {
 	log := logger.New(cfg.AppEnv, cfg.LogLevel)
 	log.Info("starting codestream", slog.String("env", cfg.AppEnv))
 
-	redisOpts, err := redis.ParseURL(cfg.RedisURL)
-	if err != nil {
-		log.Error("failed to parse redis url", slog.String("error", err.Error()))
-		os.Exit(1)
-	}
-	redisClient := redis.NewClient(redisOpts)
-
 	db, err := initDB(cfg, log)
 	if err != nil {
 		log.Error("failed to connect to database", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	srv := server.New(cfg, log, redisClient, db)
+	srv := server.New(cfg, log, db)
 
 	if err := srv.Run(); err != nil {
 		log.Error("server error", slog.String("error", err.Error()))
