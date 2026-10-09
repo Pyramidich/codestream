@@ -17,7 +17,7 @@ services:
       - key: LOG_LEVEL
         value: info
       - key: ALLOW_ORIGINS
-        value: https://codestream-frontend.onrender.com
+        value: https://se.ifmo.ru
     healthCheckPath: /ready
     plan: free
 

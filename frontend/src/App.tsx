@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
@@ -15,7 +15,7 @@ const EditorPage = React.lazy(() => import('./pages/EditorPage'))
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Layout>
           <Suspense fallback={<div className="p-4 text-gray-600">Loading...</div>}>
             <Routes>
@@ -34,7 +34,7 @@ function App() {
             </Routes>
           </Suspense>
         </Layout>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   )
 }

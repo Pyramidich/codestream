@@ -9,6 +9,7 @@ import (
 
 	"github.com/ilya/codestream/internal/config"
 	"github.com/ilya/codestream/internal/logger"
+	"github.com/ilya/codestream/internal/models"
 	"github.com/ilya/codestream/internal/server"
 )
 
@@ -40,6 +41,18 @@ func initDB(cfg *config.Config, log *slog.Logger) (*gorm.DB, error) {
 		Logger: logger.NewGORMLogger(log),
 	})
 	if err != nil {
+		return nil, err
+	}
+
+	if err := db.AutoMigrate(
+		&models.User{},
+		&models.RefreshToken{},
+		&models.Project{},
+		&models.ProjectMember{},
+		&models.File{},
+		&models.DocumentVersion{},
+		&models.ChangeHistory{},
+	); err != nil {
 		return nil, err
 	}
 

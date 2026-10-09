@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/~s503255/codestream/',
   plugins: [react()],
   resolve: {
     alias: {

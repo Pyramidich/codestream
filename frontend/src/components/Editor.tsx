@@ -40,7 +40,7 @@ const Editor: React.FC<EditorProps> = ({ fileId, language = 'plaintext' }) => {
   useEffect(() => {
     const token = getAccessToken()
     if (!token) {
-      window.location.href = '/login'
+      window.location.href = 'login'
       return
     }
 
